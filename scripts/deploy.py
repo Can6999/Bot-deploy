@@ -84,16 +84,15 @@ def deploy_contract(name):
         return None
 
 
-
-
 def verify_contract(contract_address, name):
     option = input("Do you want to verify the contract? (yes/no): ")
     if option.lower() == "yes":
         print("[+] Verifying Contract...")
         verify_cmd = [
             "forge", "verify-contract",
-            "--private-key", PRIVATE_KEY,
+            "--rpc-url", RPC_URL,
             "--etherscan-api-key", ETHERSCAN_API_KEY,
+            "--chain", str(CHAIN_ID),  # Optional: include chain ID if needed
             contract_address,
             f"contracts/{name}.sol:{name}"
         ]
@@ -101,6 +100,8 @@ def verify_contract(contract_address, name):
         print("[✓] Contract Verified")
     else:
         print("[!] Verification Skipped")
+
+
 
 if __name__ == "__main__":
     install_foundry_dependencies()
