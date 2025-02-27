@@ -97,7 +97,7 @@ def verify_contract(contract_address, name):
 if __name__ == "__main__":
     install_foundry_dependencies()
     
-    name = input("Enter your smart contract name: ")
+    name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
     supply = input("Enter your total supply: ")
 
