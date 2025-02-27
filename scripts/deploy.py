@@ -6,6 +6,7 @@ from eth_account import Account
 
 load_dotenv()
 
+# Environment variables and web3 setup
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 RPC_URL = os.getenv("RPC_URL")
 CHAIN_ID = int(os.getenv("CHAIN_ID"))
@@ -14,6 +15,7 @@ ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
 account = Account.from_key(PRIVATE_KEY)
 
+# Smart contract template (no tokens minted on deployment)
 CONTRACT_TEMPLATE = '''
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
@@ -40,6 +42,7 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
+# File to save deployed token info (tokenName,contractAddress)
 CONTRACT_INFO_FILE = "contract_info.txt"
 
 def install_foundry_dependencies():
@@ -193,6 +196,10 @@ def transfer_tokens(contract_address):
     print(f"[✓] Transfer Transaction Hash: {web3.to_hex(tx_hash)}")
 
 def post_deployment_actions(contract_address):
+    """
+    Inner post-deployment loop.
+    This menu lets you choose actions for the deployed token.
+    """
     while True:
         print("\n=== Post Deployment Actions ===")
         print("1. Mint tokens")
@@ -223,7 +230,7 @@ def post_deployment_actions(contract_address):
 if __name__ == "__main__":
     install_foundry_dependencies()
     
-    # Check if there's an existing deployed token info
+    # Check if there's an existing deployed token info saved
     if os.path.exists(CONTRACT_INFO_FILE):
         with open(CONTRACT_INFO_FILE, "r") as f:
             saved_data = f.read().strip()
@@ -231,24 +238,30 @@ if __name__ == "__main__":
             token_name_saved, contract_address_saved = saved_data.split(',')
             resume_choice = input(f"Found a deployed token '{token_name_saved}' at address {contract_address_saved}. Resume post deployment actions for this token? (yes/no): ")
             if resume_choice.lower() == "yes":
-                post_deployment_actions(contract_address_saved)
+                while True:
+                    post_deployment_actions(contract_address_saved)
+                    resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
+                    if resume.lower() != "yes":
+                        print("Exiting all post deployment actions.")
+                        break
+                exit()
             else:
                 os.remove(CONTRACT_INFO_FILE)
                 print("Previous contract info cleared. Proceeding to new deployment...\n")
     
-    # Deploy a new token if not resuming
+    # Deploy a new token if not resuming an existing one
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
     generate_contract(name, symbol)
     compile_contract()
     contract_address = deploy_contract(name)
     if contract_address:
-        # Save deployed token info to file (token name and contract address)
+        # Save deployed token info (token name and address)
         with open(CONTRACT_INFO_FILE, "w") as f:
             f.write(f"{name},{contract_address}")
         verify_contract(contract_address, name)
         
-        # Outer loop to allow re-entry into post deployment actions
+        # Outer loop: allow re-entry into post deployment actions
         while True:
             post_deployment_actions(contract_address)
             resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
