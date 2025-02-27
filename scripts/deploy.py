@@ -74,8 +74,10 @@ def deploy_contract(name):
     print(result.stdout)
     print("Deployment Errors:")
     print(result.stderr)
-    
-    if "Deployed to:" in result.stdout:
+
+
+
+if "Deployed to:" in result.stdout:
     deployed_info = result.stdout.split("Deployed to: ")[1]
     # If "Transaction hash:" exists, split by it and take the first part
     if "Transaction hash:" in deployed_info:
@@ -84,6 +86,7 @@ def deploy_contract(name):
         contract_address = deployed_info.split("\n")[0].strip()
     print(f"[✓] Contract Deployed at: {contract_address}")
     return contract_address
+
 
 
 
