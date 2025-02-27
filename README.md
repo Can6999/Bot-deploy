@@ -1,6 +1,13 @@
-# Bot Deploy Smartcontracts on Monad Testnet
+# GUIDE
 
-This project automates smart contract deployment with:
+
+## Bot Deploy Smartcontracts on Monad Testnet
+
+>If you want to use this bot for another chain, simply just edit .env file by running :
+
+`nano .env`
+
+This Bot automates smart contract deployment with:
 - Mint Tokens
 - Burn Tokens
 - Renounce Ownership
@@ -43,6 +50,7 @@ Clone the repository :
 
 `pip install -r requirements.txt`
 
+
 ### After done, open .env file and edit like this
 `nano .env`
 
@@ -62,3 +70,5 @@ Clone the repository :
 >Run bot
 
 `python3 scripts/deploy.py`
+
+
