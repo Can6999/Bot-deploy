@@ -66,6 +66,7 @@ def deploy_contract(name):
         "forge", "create",
         "--rpc-url", RPC_URL,
         "--private-key", PRIVATE_KEY,
+        "--broadcast",  # Add this flag to broadcast the transaction
         f"contracts/{name}.sol:{name}"
     ]
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
@@ -81,6 +82,7 @@ def deploy_contract(name):
     else:
         print("[!] Deployment output did not include the expected 'Deployed to:' string.")
         return None
+
 
 def verify_contract(contract_address, name):
     option = input("Do you want to verify the contract? (yes/no): ")
