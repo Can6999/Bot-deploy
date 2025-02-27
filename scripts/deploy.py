@@ -42,7 +42,7 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
-# File to save deployed token info (tokenName,contractAddress)
+# File to save deployed token info; multiple tokens can be stored (one per line in format: tokenName,contractAddress)
 CONTRACT_INFO_FILE = "contract_info.txt"
 
 def install_foundry_dependencies():
@@ -227,28 +227,55 @@ def post_deployment_actions(contract_address):
         else:
             print("Invalid choice. Please select a valid option.")
 
-if __name__ == "__main__":
-    install_foundry_dependencies()
-    
-    # Check if there's an existing deployed token info saved
+def store_contract_info(token_name, contract_address):
+    """Append new token info (name and address) to the contract info file."""
+    with open(CONTRACT_INFO_FILE, "a") as f:
+        f.write(f"{token_name},{contract_address}\n")
+
+def list_contract_info():
+    """Read and return a list of (token_name, contract_address) tuples from the file."""
+    tokens = []
     if os.path.exists(CONTRACT_INFO_FILE):
         with open(CONTRACT_INFO_FILE, "r") as f:
-            saved_data = f.read().strip()
-        if saved_data:
-            token_name_saved, contract_address_saved = saved_data.split(',')
-            resume_choice = input(f"Found a deployed token '{token_name_saved}' at address {contract_address_saved}. Resume post deployment actions for this token? (yes/no): ")
-            if resume_choice.lower() == "yes":
-                while True:
-                    post_deployment_actions(contract_address_saved)
-                    resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
-                    if resume.lower() != "yes":
-                        print("Exiting all post deployment actions.")
-                        break
-                exit()
-            else:
-                os.remove(CONTRACT_INFO_FILE)
-                print("Previous contract info cleared. Proceeding to new deployment...\n")
-    
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        token_name, contract_address = line.split(",", 1)
+                        tokens.append((token_name, contract_address))
+                    except ValueError:
+                        continue
+    return tokens
+
+if __name__ == "__main__":
+    install_foundry_dependencies()
+
+    # If there are stored tokens, offer the option to resume post deployment actions.
+    tokens = list_contract_info()
+    if tokens:
+        print("Found the following deployed tokens:")
+        for idx, (token_name, contract_address) in enumerate(tokens, start=1):
+            print(f"{idx}. {token_name} at {contract_address}")
+        print("0. Deploy a new token")
+        choice = input("Select a token to resume post deployment actions (or 0 to deploy new): ")
+        if choice != "0":
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(tokens):
+                    token_name_saved, contract_address_saved = tokens[idx]
+                    print(f"Resuming post deployment actions for {token_name_saved} at {contract_address_saved}")
+                    while True:
+                        post_deployment_actions(contract_address_saved)
+                        resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
+                        if resume.lower() != "yes":
+                            print("Exiting all post deployment actions.")
+                            break
+                    exit()
+                else:
+                    print("Invalid selection. Proceeding to new deployment...")
+            except ValueError:
+                print("Invalid selection. Proceeding to new deployment...")
+
     # Deploy a new token if not resuming an existing one
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
@@ -256,9 +283,7 @@ if __name__ == "__main__":
     compile_contract()
     contract_address = deploy_contract(name)
     if contract_address:
-        # Save deployed token info (token name and address)
-        with open(CONTRACT_INFO_FILE, "w") as f:
-            f.write(f"{name},{contract_address}")
+        store_contract_info(name, contract_address)
         verify_contract(contract_address, name)
         
         # Outer loop: allow re-entry into post deployment actions
