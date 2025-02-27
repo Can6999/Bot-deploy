@@ -111,7 +111,7 @@ def prompt_valid_address(message):
     """Prompt the user for an address until a valid Ethereum address is provided."""
     while True:
         addr = input(message).strip()
-        if web3.isAddress(addr):
+        if web3.is_address(addr):
             return web3.toChecksumAddress(addr)
         else:
             print("Invalid address. Please enter a valid Ethereum address.")
