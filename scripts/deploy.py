@@ -2,6 +2,7 @@ import os
 import subprocess
 from dotenv import load_dotenv
 from web3 import Web3
+from eth_account import Account
 
 load_dotenv()
 
@@ -11,6 +12,7 @@ CHAIN_ID = int(os.getenv("CHAIN_ID"))
 ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
 
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
+account = Account.from_key(PRIVATE_KEY)
 
 CONTRACT_TEMPLATE = '''
 // SPDX-License-Identifier: MIT
@@ -21,7 +23,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract {name} is ERC20, Ownable {{
     constructor() ERC20("{name}", "{symbol}") Ownable(msg.sender) {{
-        _mint(msg.sender, {supply} * 10 ** decimals());
+        // No tokens minted on deployment.
     }}
 
     function mint(address to, uint256 amount) public onlyOwner {{
@@ -38,17 +40,17 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
-
 def install_foundry_dependencies():
-    if os.path.exists("requirements.forge"):
+    if not os.path.exists("lib"):
         print("[+] Installing Foundry Dependencies...")
         subprocess.run(["forge", "install"], check=True)
         print("[✓] Foundry Dependencies Installed")
+    else:
+        print("[✓] Foundry Dependencies Already Installed")
 
-def generate_contract(name, symbol, supply):
+def generate_contract(name, symbol):
     print(f"[+] Generating {name} Smart Contract...")
-    contract_code = CONTRACT_TEMPLATE.format(name=name, symbol=symbol, supply=supply)
-
+    contract_code = CONTRACT_TEMPLATE.format(name=name, symbol=symbol)
     os.makedirs("contracts", exist_ok=True)
     with open(f"contracts/{name}.sol", "w") as file:
         file.write(contract_code)
@@ -56,10 +58,11 @@ def generate_contract(name, symbol, supply):
 
 def compile_contract():
     print("[+] Compiling Contract...")
+    if os.path.exists("out"):
+        print("[+] Cleaning previous build files...")
+        subprocess.run(["rm", "-rf", "out"])
     subprocess.run(["forge", "build"], check=True)
     print("[✓] Compilation Done")
-
-
 
 def deploy_contract(name):
     print("[+] Deploying Contract...")
@@ -68,30 +71,19 @@ def deploy_contract(name):
         "--rpc-url", RPC_URL,
         "--private-key", PRIVATE_KEY,
         "--broadcast",
-        "--force",  # Force broadcasting even if Foundry thinks nothing has changed
+        "--force",
         f"contracts/{name}.sol:{name}"
     ]
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
     print("Deployment Output:")
     print(result.stdout)
-    print("Deployment Errors:")
-    print(result.stderr)
-    
     if "Deployed to:" in result.stdout:
-        deployed_info = result.stdout.split("Deployed to: ")[1]
-        # If "Transaction hash:" exists, split by it and take the first part
-        if "Transaction hash:" in deployed_info:
-            contract_address = deployed_info.split("Transaction hash:")[0].strip()
-        else:
-            contract_address = deployed_info.split("\n")[0].strip()
+        contract_address = result.stdout.split("Deployed to: ")[1].split("\n")[0].strip()
         print(f"[✓] Contract Deployed at: {contract_address}")
         return contract_address
     else:
-        print("[!] Deployment output did not include the expected 'Deployed to:' string.")
+        print("[!] Deployment Failed")
         return None
-
-
-
 
 def verify_contract(contract_address, name):
     option = input("Do you want to verify the contract? (yes/no): ")
@@ -110,19 +102,111 @@ def verify_contract(contract_address, name):
     else:
         print("[!] Verification Skipped")
 
+def mint_tokens(contract_address):
+    recipient = input("Enter recipient address for minting: ")
+    amount = input("Enter amount to mint: ")
+    print(f"[+] Minting {amount} tokens to {recipient}...")
+    # Encode function call for mint(address,uint256)
+    mint_selector = web3.keccak(text="mint(address,uint256)")[:4]
+    encoded_recipient = bytes.fromhex(recipient[2:]).rjust(32, b'\0')
+    encoded_amount = int(amount).to_bytes(32, 'big')
+    data = mint_selector + encoded_recipient + encoded_amount
+    tx = {
+        "to": contract_address,
+        "data": data,
+        "gas": 100000,
+        "gasPrice": web3.to_wei("10", "gwei"),
+        "chainId": CHAIN_ID,
+        "nonce": web3.eth.get_transaction_count(account.address),
+    }
+    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
+    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Mint Transaction Hash: {web3.to_hex(tx_hash)}")
 
+def burn_tokens(contract_address):
+    amount = input("Enter amount to burn: ")
+    print(f"[+] Burning {amount} tokens...")
+    burn_selector = web3.keccak(text="burn(uint256)")[:4]
+    encoded_amount = int(amount).to_bytes(32, 'big')
+    data = burn_selector + encoded_amount
+    tx = {
+        "to": contract_address,
+        "data": data,
+        "gas": 100000,
+        "gasPrice": web3.to_wei("10", "gwei"),
+        "chainId": CHAIN_ID,
+        "nonce": web3.eth.get_transaction_count(account.address),
+    }
+    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
+    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Burn Transaction Hash: {web3.to_hex(tx_hash)}")
 
+def renounce_ownership(contract_address):
+    print("[+] Renouncing Ownership...")
+    renounce_selector = web3.keccak(text="renounce()")[:4]
+    tx = {
+        "to": contract_address,
+        "data": renounce_selector,
+        "gas": 100000,
+        "gasPrice": web3.to_wei("10", "gwei"),
+        "chainId": CHAIN_ID,
+        "nonce": web3.eth.get_transaction_count(account.address),
+    }
+    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
+    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Renounce Ownership Transaction Hash: {web3.to_hex(tx_hash)}")
+
+def transfer_tokens(contract_address):
+    recipient = input("Enter the recipient address: ")
+    amount = input("Enter the amount to transfer: ")
+    print(f"[+] Transferring {amount} tokens to {recipient}...")
+    transfer_selector = web3.keccak(text="transfer(address,uint256)")[:4]
+    encoded_recipient = bytes.fromhex(recipient[2:]).rjust(32, b'\0')
+    encoded_amount = int(amount).to_bytes(32, 'big')
+    data = transfer_selector + encoded_recipient + encoded_amount
+    tx = {
+        "to": contract_address,
+        "data": data,
+        "gas": 100000,
+        "gasPrice": web3.to_wei("10", "gwei"),
+        "chainId": CHAIN_ID,
+        "nonce": web3.eth.get_transaction_count(account.address),
+    }
+    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
+    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Transfer Transaction Hash: {web3.to_hex(tx_hash)}")
+
+def post_deployment_actions(contract_address):
+    while True:
+        print("\n=== Post Deployment Actions ===")
+        print("1. Mint tokens")
+        print("2. Burn tokens")
+        print("3. Renounce ownership")
+        print("4. Transfer tokens")
+        print("0. Exit post deployment actions")
+        choice = input("Select an action (0-4): ")
+        if choice == "1":
+            mint_tokens(contract_address)
+        elif choice == "2":
+            burn_tokens(contract_address)
+        elif choice == "3":
+            renounce_ownership(contract_address)
+        elif choice == "4":
+            transfer_tokens(contract_address)
+        elif choice == "0":
+            print("Exiting post deployment actions...")
+            break
+        else:
+            print("Invalid choice. Please select a valid option.")
 
 if __name__ == "__main__":
     install_foundry_dependencies()
-    
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
-    supply = input("Enter your total supply: ")
-
-    generate_contract(name, symbol, supply)
+    generate_contract(name, symbol)
     compile_contract()
     contract_address = deploy_contract(name)
-
     if contract_address:
         verify_contract(contract_address, name)
+        post_deployment_actions(contract_address)
+ 
