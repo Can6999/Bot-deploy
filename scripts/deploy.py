@@ -59,6 +59,8 @@ def compile_contract():
     subprocess.run(["forge", "build"], check=True)
     print("[✓] Compilation Done")
 
+
+
 def deploy_contract(name):
     print("[+] Deploying Contract...")
     deploy_cmd = [
@@ -74,18 +76,19 @@ def deploy_contract(name):
     print(result.stdout)
     print("Deployment Errors:")
     print(result.stderr)
-
-
-
-if "Deployed to:" in result.stdout:
-    deployed_info = result.stdout.split("Deployed to: ")[1]
-    # If "Transaction hash:" exists, split by it and take the first part
-    if "Transaction hash:" in deployed_info:
-        contract_address = deployed_info.split("Transaction hash:")[0].strip()
+    
+    if "Deployed to:" in result.stdout:
+        deployed_info = result.stdout.split("Deployed to: ")[1]
+        # If "Transaction hash:" exists, split by it and take the first part
+        if "Transaction hash:" in deployed_info:
+            contract_address = deployed_info.split("Transaction hash:")[0].strip()
+        else:
+            contract_address = deployed_info.split("\n")[0].strip()
+        print(f"[✓] Contract Deployed at: {contract_address}")
+        return contract_address
     else:
-        contract_address = deployed_info.split("\n")[0].strip()
-    print(f"[✓] Contract Deployed at: {contract_address}")
-    return contract_address
+        print("[!] Deployment output did not include the expected 'Deployed to:' string.")
+        return None
 
 
 
