@@ -55,7 +55,7 @@ Clone the repository :
 `nano .env`
 
 
->RPC_URL=https://rpc.testnet.monad.xyz
+>RPC_URL=https://testnet-rpc.monad.xyz
 
 >PRIVATE_KEY=your_private_key
 
