@@ -40,6 +40,8 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
+CONTRACT_INFO_FILE = "contract_info.txt"
+
 def install_foundry_dependencies():
     if not os.path.exists("lib"):
         print("[+] Installing Foundry Dependencies...")
@@ -102,11 +104,21 @@ def verify_contract(contract_address, name):
     else:
         print("[!] Verification Skipped")
 
-def mint_tokens(contract_address):
-    recipient = input("Enter recipient address for minting: ")
-    amount = input("Enter amount to mint: ")
+def prompt_valid_address(message):
+    """Prompt the user for an address until a valid Ethereum address is provided."""
+    while True:
+        addr = input(message).strip()
+        if web3.isAddress(addr):
+            return web3.toChecksumAddress(addr)
+        else:
+            print("Invalid address. Please enter a valid Ethereum address.")
+
+def mint_tokens(contract_address, recipient=None, amount=None):
+    if recipient is None:
+        recipient = prompt_valid_address("Enter recipient address for minting: ")
+    if amount is None:
+        amount = input("Enter amount to mint: ")
     print(f"[+] Minting {amount} tokens to {recipient}...")
-    # Encode function call for mint(address,uint256)
     mint_selector = web3.keccak(text="mint(address,uint256)")[:4]
     encoded_recipient = bytes.fromhex(recipient[2:]).rjust(32, b'\0')
     encoded_amount = int(amount).to_bytes(32, 'big')
@@ -115,8 +127,8 @@ def mint_tokens(contract_address):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),         # Increased fee
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"), 
+        "maxFeePerGas": web3.to_wei("30", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -134,8 +146,8 @@ def burn_tokens(contract_address):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),         # Increased fee
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
+        "maxFeePerGas": web3.to_wei("30", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -150,8 +162,8 @@ def renounce_ownership(contract_address):
         "to": contract_address,
         "data": renounce_selector,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),         # Increased fee
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
+        "maxFeePerGas": web3.to_wei("30", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -160,7 +172,7 @@ def renounce_ownership(contract_address):
     print(f"[✓] Renounce Ownership Transaction Hash: {web3.to_hex(tx_hash)}")
 
 def transfer_tokens(contract_address):
-    recipient = input("Enter the recipient address: ")
+    recipient = prompt_valid_address("Enter the recipient address: ")
     amount = input("Enter the amount to transfer: ")
     print(f"[+] Transferring {amount} tokens to {recipient}...")
     transfer_selector = web3.keccak(text="transfer(address,uint256)")[:4]
@@ -171,8 +183,8 @@ def transfer_tokens(contract_address):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),         # Increased fee
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
+        "maxFeePerGas": web3.to_wei("30", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -198,19 +210,48 @@ def post_deployment_actions(contract_address):
         elif choice == "4":
             transfer_tokens(contract_address)
         elif choice == "0":
-            print("Exiting post deployment actions...")
-            break
+            confirm = input("Are you sure you want to exit post deployment actions? (yes/no): ")
+            if confirm.lower() == "yes":
+                print("Exiting current post deployment session...")
+                break
+            else:
+                print("Continuing post deployment actions...")
+                continue
         else:
             print("Invalid choice. Please select a valid option.")
 
 if __name__ == "__main__":
     install_foundry_dependencies()
+    
+    # Check if there's an existing deployed token info
+    if os.path.exists(CONTRACT_INFO_FILE):
+        with open(CONTRACT_INFO_FILE, "r") as f:
+            saved_data = f.read().strip()
+        if saved_data:
+            token_name_saved, contract_address_saved = saved_data.split(',')
+            resume_choice = input(f"Found a deployed token '{token_name_saved}' at address {contract_address_saved}. Resume post deployment actions for this token? (yes/no): ")
+            if resume_choice.lower() == "yes":
+                post_deployment_actions(contract_address_saved)
+            else:
+                os.remove(CONTRACT_INFO_FILE)
+                print("Previous contract info cleared. Proceeding to new deployment...\n")
+    
+    # Deploy a new token if not resuming
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
     generate_contract(name, symbol)
     compile_contract()
     contract_address = deploy_contract(name)
     if contract_address:
+        # Save deployed token info to file (token name and contract address)
+        with open(CONTRACT_INFO_FILE, "w") as f:
+            f.write(f"{name},{contract_address}")
         verify_contract(contract_address, name)
-        post_deployment_actions(contract_address)
- 
+        
+        # Outer loop to allow re-entry into post deployment actions
+        while True:
+            post_deployment_actions(contract_address)
+            resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
+            if resume.lower() != "yes":
+                print("Exiting all post deployment actions.")
+                break
