@@ -59,6 +59,7 @@ def compile_contract():
     subprocess.run(["forge", "build"], check=True)
     print("[✓] Compilation Done")
 
+
 def deploy_contract(name):
     print("[+] Deploying Contract...")
     deploy_cmd = [
@@ -68,13 +69,17 @@ def deploy_contract(name):
         f"contracts/{name}.sol:{name}"
     ]
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
-    if result.returncode == 0:
+    print("Deployment Output:")
+    print(result.stdout)
+    print("Deployment Errors:")
+    print(result.stderr)
+    
+    if "Deployed to:" in result.stdout:
         contract_address = result.stdout.split("Deployed to: ")[1].strip()
         print(f"[✓] Contract Deployed at: {contract_address}")
         return contract_address
     else:
-        print("[!] Deployment Failed")
-        print(result.stderr)
+        print("[!] Deployment output did not include the expected 'Deployed to:' string.")
         return None
 
 def verify_contract(contract_address, name):
