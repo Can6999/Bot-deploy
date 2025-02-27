@@ -99,16 +99,17 @@ def verify_contract(contract_address, name):
         print("[+] Verifying Contract...")
         verify_cmd = [
             "forge", "verify-contract",
-            "--rpc-url", RPC_URL,
-            "--etherscan-api-key", ETHERSCAN_API_KEY,
-            "--chain", str(CHAIN_ID),  # Optional: include chain ID if needed
             contract_address,
-            f"contracts/{name}.sol:{name}"
+            f"contracts/{name}.sol:{name}",
+            "--rpc-url", RPC_URL,
+            "--verifier", "sourcify",
+            "--verifier-url", "https://sourcify-api-monad.blockvision.org"
         ]
         subprocess.run(verify_cmd, check=True)
         print("[✓] Contract Verified")
     else:
         print("[!] Verification Skipped")
+
 
 
 
