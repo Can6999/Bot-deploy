@@ -92,7 +92,6 @@ def verify_contract(contract_address, name):
         print("[+] Verifying Contract...")
         verify_cmd = [
             "forge", "verify-contract",
-            "--rpc-url", RPC_URL,
             "--private-key", PRIVATE_KEY,
             "--etherscan-api-key", ETHERSCAN_API_KEY,
             contract_address,
