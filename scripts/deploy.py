@@ -1,6 +1,5 @@
 import os
 import subprocess
-import shutil
 from dotenv import load_dotenv
 from web3 import Web3
 
@@ -39,17 +38,12 @@ contract {name} is ERC20, Ownable {{
     }}
 }}
 '''
-def check_foundry():
-    if shutil.which("forge") is None:
-        print("[!] Foundry not found.")
-        print("Please install Foundry using:")
-        print("curl -L https://foundry.paradigm.xyz | bash && foundryup")
-        exit()
-    else:
-        print("[✓] Foundry Installed")
 
-check_foundry()
-
+def install_foundry_dependencies():
+    if os.path.exists("requirements.forge"):
+        print("[+] Installing Foundry Dependencies...")
+        subprocess.run(["forge", "install"], check=True)
+        print("[✓] Foundry Dependencies Installed")
 
 def generate_contract(name, symbol, supply):
     print(f"[+] Generating {name} Smart Contract...")
@@ -58,7 +52,7 @@ def generate_contract(name, symbol, supply):
     os.makedirs("contracts", exist_ok=True)
     with open(f"contracts/{name}.sol", "w") as file:
         file.write(contract_code)
-    print(f"[✓] Contract {name}.sol generated")
+    print(f"[✓] Contract {name}.sol Generated")
 
 def compile_contract():
     print("[+] Compiling Contract...")
@@ -73,7 +67,6 @@ def deploy_contract(name):
         "--private-key", PRIVATE_KEY,
         f"contracts/{name}.sol:{name}"
     ]
-
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
     if result.returncode == 0:
         contract_address = result.stdout.split("Deployed to: ")[1].strip()
@@ -85,7 +78,7 @@ def deploy_contract(name):
         return None
 
 def verify_contract(contract_address, name):
-    option = input("Do you want to verify the contract on Monad Explorer? (yes/no): ")
+    option = input("Do you want to verify the contract? (yes/no): ")
     if option.lower() == "yes":
         print("[+] Verifying Contract...")
         verify_cmd = [
@@ -101,33 +94,9 @@ def verify_contract(contract_address, name):
     else:
         print("[!] Verification Skipped")
 
-def mint_tokens(contract_address):
-    option = input("Do you want to mint tokens? (yes/no): ")
-    if option.lower() == "yes":
-        amount = input("Enter mint amount: ")
-        print(f"[+] Minting {amount} Tokens...")
-        print("[✓] Tokens Minted")
-    else:
-        print("[!] Mint Skipped")
-
-def burn_tokens():
-    option = input("Do you want to burn tokens? (yes/no): ")
-    if option.lower() == "yes":
-        amount = input("Enter burn amount: ")
-        print(f"[+] Burning {amount} Tokens...")
-        print("[✓] Tokens Burned")
-    else:
-        print("[!] Burn Skipped")
-
-def renounce_ownership():
-    option = input("Do you want to renounce ownership? (yes/no): ")
-    if option.lower() == "yes":
-        print("[+] Renouncing Ownership...")
-        print("[✓] Ownership Renounced")
-    else:
-        print("[!] Ownership Not Renounced")
-
 if __name__ == "__main__":
+    install_foundry_dependencies()
+    
     name = input("Enter your smart contract name: ")
     symbol = input("Enter your token symbol: ")
     supply = input("Enter your total supply: ")
@@ -138,6 +107,3 @@ if __name__ == "__main__":
 
     if contract_address:
         verify_contract(contract_address, name)
-        mint_tokens(contract_address)
-        burn_tokens()
-        renounce_ownership()
