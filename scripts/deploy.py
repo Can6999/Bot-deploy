@@ -59,14 +59,14 @@ def compile_contract():
     subprocess.run(["forge", "build"], check=True)
     print("[✓] Compilation Done")
 
-
 def deploy_contract(name):
     print("[+] Deploying Contract...")
     deploy_cmd = [
         "forge", "create",
         "--rpc-url", RPC_URL,
         "--private-key", PRIVATE_KEY,
-        "--broadcast",  # Add this flag to broadcast the transaction
+        "--broadcast",
+        "--force",  # Force broadcasting even if Foundry thinks nothing has changed
         f"contracts/{name}.sol:{name}"
     ]
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
@@ -82,6 +82,8 @@ def deploy_contract(name):
     else:
         print("[!] Deployment output did not include the expected 'Deployed to:' string.")
         return None
+
+
 
 
 def verify_contract(contract_address, name):
