@@ -127,8 +127,8 @@ def mint_tokens(contract_address, recipient=None, amount=None):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("30", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
+        "maxFeePerGas": web3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -146,8 +146,8 @@ def burn_tokens(contract_address):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("30", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
+        "maxFeePerGas": web3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -162,8 +162,8 @@ def renounce_ownership(contract_address):
         "to": contract_address,
         "data": renounce_selector,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("30", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
+        "maxFeePerGas": web3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
@@ -183,8 +183,8 @@ def transfer_tokens(contract_address):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("30", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("2", "gwei"),
+        "maxFeePerGas": web3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
         "chainId": CHAIN_ID,
         "nonce": web3.eth.get_transaction_count(account.address),
     }
