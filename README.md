@@ -1,4 +1,4 @@
-# Smart Contract Automation 🔥
+# Bot deploy smartcontract monad testnet
 
 This project automates smart contract deployment with:
 - Mint Tokens
