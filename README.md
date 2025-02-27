@@ -58,9 +58,6 @@ Clone the repository :
 
 ### Run the bot
 
->Run this first to install foundry dependencies
-
-`forge install`
 
 >Run bot
 
