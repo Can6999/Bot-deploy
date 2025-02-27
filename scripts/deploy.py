@@ -20,9 +20,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract {name} is ERC20, Ownable {{
-    constructor() ERC20("{name}", "{symbol}") {{
+    constructor() ERC20("{name}", "{symbol}") Ownable(msg.sender) {{
         _mint(msg.sender, {supply} * 10 ** decimals());
-        transferOwnership(msg.sender);
     }}
 
     function mint(address to, uint256 amount) public onlyOwner {{
@@ -38,6 +37,7 @@ contract {name} is ERC20, Ownable {{
     }}
 }}
 '''
+
 
 def install_foundry_dependencies():
     if os.path.exists("requirements.forge"):
