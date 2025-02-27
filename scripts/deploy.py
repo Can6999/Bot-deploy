@@ -76,12 +76,15 @@ def deploy_contract(name):
     print(result.stderr)
     
     if "Deployed to:" in result.stdout:
-        contract_address = result.stdout.split("Deployed to: ")[1].strip()
-        print(f"[✓] Contract Deployed at: {contract_address}")
-        return contract_address
+    deployed_info = result.stdout.split("Deployed to: ")[1]
+    # If "Transaction hash:" exists, split by it and take the first part
+    if "Transaction hash:" in deployed_info:
+        contract_address = deployed_info.split("Transaction hash:")[0].strip()
     else:
-        print("[!] Deployment output did not include the expected 'Deployed to:' string.")
-        return None
+        contract_address = deployed_info.split("\n")[0].strip()
+    print(f"[✓] Contract Deployed at: {contract_address}")
+    return contract_address
+
 
 
 def verify_contract(contract_address, name):
