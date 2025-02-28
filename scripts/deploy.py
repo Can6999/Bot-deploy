@@ -106,40 +106,43 @@ def select_chain():
 
 # --- Token Storage Functions ---
 
-# We'll now store tokens with a verification status.
-# Format for common file: key_label, token_name, contract_address, verification_status
-def store_contract_info_single(token_name, contract_address, key_label, filename="contract_info.txt"):
+# Updated common file storage: now storing key_label, chain_name, token_name, contract_address, verification_status.
+def store_contract_info_single(token_name, contract_address, key_label, chain_name, filename="contract_info.txt"):
     with open(filename, "a") as f:
-        f.write(f"{key_label},{token_name},{contract_address},unverified\n")
+        f.write(f"{key_label},{chain_name},{token_name},{contract_address},unverified\n")
 
-def list_contract_info_single(filename="contract_info.txt", key_label=None):
+def list_contract_info_single(filename="contract_info.txt", key_label=None, chain_name=None):
     tokens = []
     if os.path.exists(filename):
         with open(filename, "r") as f:
             for line in f:
                 line = line.strip()
                 if line:
-                    parts = line.split(",", 3)  # key_label, token_name, contract_address, status
-                    if len(parts) == 4:
+                    # Expected format: key_label, chain_name, token_name, contract_address, status
+                    parts = line.split(",", 4)
+                    if len(parts) == 5:
+                        stored_key, stored_chain, token_name, contract_address, status = parts
+                    elif len(parts) == 4:
+                        # Fallback if chain wasn't recorded
                         stored_key, token_name, contract_address, status = parts
-                    elif len(parts) == 3:
-                        stored_key, token_name, contract_address = parts
-                        status = "unverified"
+                        stored_chain = None
                     else:
                         continue
-                    if key_label is None or stored_key == key_label:
+                    if ((key_label is None or stored_key == key_label) and 
+                        (chain_name is None or stored_chain == chain_name)):
                         tokens.append((token_name, contract_address, status))
     return tokens
 
 def get_tokens_filename(key_label):
     return f"tokens_{key_label}.txt"
 
-def store_contract_info_separate(token_name, contract_address, key_label):
+# Updated separate file storage: now storing chain_name, token_name, contract_address, verification_status.
+def store_contract_info_separate(token_name, contract_address, key_label, chain_name):
     filename = get_tokens_filename(key_label)
     with open(filename, "a") as f:
-        f.write(f"{token_name},{contract_address},unverified\n")
+        f.write(f"{chain_name},{token_name},{contract_address},unverified\n")
 
-def list_contract_info_separate(key_label):
+def list_contract_info_separate(key_label, chain_name):
     tokens = []
     filename = get_tokens_filename(key_label)
     if os.path.exists(filename):
@@ -147,17 +150,20 @@ def list_contract_info_separate(key_label):
             for line in f:
                 line = line.strip()
                 if line:
-                    parts = line.split(",", 2)
-                    if len(parts) == 3:
-                        token_name, contract_address, status = parts
-                    elif len(parts) == 2:
-                        token_name, contract_address = parts
+                    # Expected format: chain_name, token_name, contract_address, status
+                    parts = line.split(",", 3)
+                    if len(parts) == 4:
+                        stored_chain, token_name, contract_address, status = parts
+                    elif len(parts) == 3:
+                        stored_chain, token_name, contract_address = parts
                         status = "unverified"
                     else:
                         continue
-                    tokens.append((token_name, contract_address, status))
+                    if chain_name is None or stored_chain == chain_name:
+                        tokens.append((token_name, contract_address, status))
     return tokens
 
+# Updated status updater to handle both storage formats.
 def update_contract_status_in_file(filename, contract_address, new_status):
     if not os.path.exists(filename):
         return
@@ -168,15 +174,22 @@ def update_contract_status_in_file(filename, contract_address, new_status):
             if not line_strip:
                 continue
             parts = line_strip.split(",")
-            # Expecting at least three parts: key_label, token_name, contract_address
-            if len(parts) >= 3 and parts[2] == contract_address:
-                # Update the status field
-                if len(parts) == 3:
-                    parts.append(new_status)
+            # For common file: key_label, chain_name, token_name, contract_address, status (length 5)
+            if len(parts) == 5:
+                if parts[3] == contract_address:
+                    parts[4] = new_status
+                    updated_line = ",".join(parts) + "\n"
+                    updated_lines.append(updated_line)
                 else:
+                    updated_lines.append(line)
+            # For separate file: chain_name, token_name, contract_address, status (length 4)
+            elif len(parts) == 4:
+                if parts[2] == contract_address:
                     parts[3] = new_status
-                updated_line = ",".join(parts) + "\n"
-                updated_lines.append(updated_line)
+                    updated_line = ",".join(parts) + "\n"
+                    updated_lines.append(updated_line)
+                else:
+                    updated_lines.append(line)
             else:
                 updated_lines.append(line)
     with open(filename, "w") as f:
@@ -444,12 +457,12 @@ def post_deployment_actions(contract_address, name):
 if __name__ == "__main__":
     install_foundry_dependencies()
 
-    # --- Listing previously deployed tokens ---
-    tokens_common = list_contract_info_single(filename=CONTRACT_INFO_FILE, key_label=selected_key_label)
-    tokens_separate = list_contract_info_separate(selected_key_label)
+    # --- Listing previously deployed tokens (filtered by chain) ---
+    tokens_common = list_contract_info_single(filename=CONTRACT_INFO_FILE, key_label=selected_key_label, chain_name=chain_config["name"])
+    tokens_separate = list_contract_info_separate(selected_key_label, chain_config["name"])
 
     if tokens_common or tokens_separate:
-        print("Found deployed tokens for your selected key:")
+        print("Found deployed tokens for your selected key on", chain_config["name"] + ":")
         if tokens_common:
             print("\n-- Common File Storage --")
             for idx, (token_name, contract_address, status) in enumerate(tokens_common, start=1):
@@ -487,8 +500,8 @@ if __name__ == "__main__":
     contract_address = deploy_contract(name)
     if contract_address:
         # Save token info using both approaches.
-        store_contract_info_single(name, contract_address, selected_key_label, filename=CONTRACT_INFO_FILE)
-        store_contract_info_separate(name, contract_address, selected_key_label)
+        store_contract_info_single(name, contract_address, selected_key_label, chain_config["name"], filename=CONTRACT_INFO_FILE)
+        store_contract_info_separate(name, contract_address, selected_key_label, chain_config["name"])
         verify_contract(contract_address, name)  # Initial verification prompt
         
         # Outer loop: allow re-entry into post deployment actions.
