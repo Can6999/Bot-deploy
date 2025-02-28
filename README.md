@@ -1,19 +1,35 @@
 # GUIDE
 
 
-## Bot Deploy Smartcontracts on Monad Testnet
+## Deploying Tools
 
->If you want to use this bot for another chain, simply just edit .env file by running :
 
-`nano .env`
+>Deploying tools to help you deploy Smartcontracts
 
-This Bot automates smart contract deployment with:
+>Curently support 4 Chains u can deploy on :
+
+-Sepolia
+
+-Monad Testnet
+
+-Somnia Testnet
+
+-Rome Testnet
+
+>You can also add another chain if you want by simply add it in "chains.txt", make sure to follow the format written in it. 
+
+What you can do with this tools :
 - Mint Tokens
 - Burn Tokens
 - Renounce Ownership
-- Auto Verification
+- Verification Smartcontracts(only support for Monad & Sepolia for now)
+- Support Multi Private Key
+- Mamage your deployed token once it deployed with each private key
+- Labelled your deployed Smart Contract for unverified one
 
->This bot requires "foundry" if u havent installed it, dont worry it will automatically install it when you run the bot
+>This tool requires "foundry" for Mint,Burn,Renounce,Verification,and Transfer. if u havent installed it, dont worry it will automatically install it when you run the bot. Or if you dont want it u can just install solc :
+
+'sudo snap install solc'
 
 ## Install foundry manually
 
@@ -51,21 +67,7 @@ Clone the repository :
 `pip install -r requirements.txt`
 
 
-### After done, open .env file and edit like this
-`nano .env`
-
-
->RPC_URL=https://testnet-rpc.monad.xyz
-
->PRIVATE_KEY=your_private_key
-
->CHAIN_ID=10143
-
->ETHERSCAN_API_KEY=https://sourcify-api-monad.blockvision.org
-
-
 ### Run the bot
-
 
 >Run bot
 
