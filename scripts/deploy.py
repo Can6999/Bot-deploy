@@ -198,7 +198,7 @@ account = Account.from_key(PRIVATE_KEY)
 chain_config = select_chain()
 RPC_URL = chain_config["RPC_URL"]
 CHAIN_ID = int(chain_config["CHAIN_ID"])
-ETHERSCAN_API_KEY = chain_config.get("ETHERSCAN_API_KEY", "")
+# ETHERSCAN_API_KEY is no longer used.
 
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
 
@@ -284,7 +284,7 @@ def deploy_contract(name):
 
 def verify_contract(contract_address, name, prompt_for_verification=True):
     """
-    Verify the contract using Etherscan if available, otherwise use Sourcify.
+    Verify the contract using Sourcify verification.
     If prompt_for_verification is True, ask the user before verifying.
     """
     if prompt_for_verification:
@@ -292,20 +292,18 @@ def verify_contract(contract_address, name, prompt_for_verification=True):
         if option.lower() != "yes":
             print("[!] Verification Skipped")
             return
-    print("[+] Verifying Contract...") 
-          
-    if :
-        verifier_url = get_verifier_url(chain_config)
-        print("[+] Using Sourcify verification for chain:", chain_config["name"])
-        print("[+] Verifier URL:", verifier_url)
-        verify_cmd = [
-            "forge", "verify-contract",
-            contract_address,
-            f"contracts/{name}.sol:{name}",
-            "--rpc-url", RPC_URL,
-            "--verifier", "sourcify",
-            "--verifier-url", verifier_url
-        ]
+    print("[+] Verifying Contract...")
+    verifier_url = get_verifier_url(chain_config)
+    print("[+] Using Sourcify verification for chain:", chain_config["name"])
+    print("[+] Verifier URL:", verifier_url)
+    verify_cmd = [
+        "forge", "verify-contract",
+        contract_address,
+        f"contracts/{name}.sol:{name}",
+        "--rpc-url", RPC_URL,
+        "--verifier", "sourcify",
+        "--verifier-url", verifier_url
+    ]
     subprocess.run(verify_cmd, check=True)
     print("[✓] Contract Verified")
     update_verified_status(contract_address, selected_key_label)
