@@ -203,7 +203,8 @@ def deploy_contract(rpc_url, private_key, name):
         f"contracts/{name}.sol:{name}"
     ]
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
-    print("Deployment Output:")                                                                                                                             print(result.stdout)
+    print("Deployment Output:")                                                                                                                             
+    print(result.stdout)
     if "Deployed to:" in result.stdout:
         contract_address = result.stdout.split("Deployed to: ")[1].split("\n")[0].strip()
         print(f"[✓] Contract Deployed at: {contract_address}")
@@ -354,7 +355,8 @@ def mint_tokens(w3, acct, chain_id, contract_address, private_key):
     encoded_amount = int(amount).to_bytes(32, 'big')
     data = mint_selector + encoded_recipient + encoded_amount
     tx = {
-        "to": contract_address,                                                                                                                                                          "data": data,
+        "to": contract_address,                                                                                                                                                          
+        "data": data,
         "gas": 100000,
         "maxFeePerGas": w3.to_wei("57", "gwei"),
         "maxPriorityFeePerGas": w3.to_wei("50", "gwei"),
@@ -371,7 +373,8 @@ def burn_tokens(w3, acct, chain_id, contract_address, private_key):
         return
     print(f"[+] Burning {amount} tokens...")
     burn_selector = w3.keccak(text="burn(uint256)")[:4]
-    encoded_amount = int(amount).to_bytes(32, 'big')                                                                                                                                 data = burn_selector + encoded_amount
+    encoded_amount = int(amount).to_bytes(32, 'big')                                                                                                                                 
+    data = burn_selector + encoded_amount
     tx = {
         "to": contract_address,
         "data": data,
@@ -477,7 +480,8 @@ def main():
             w3, acct = init_web3(rpc_url, private_key)
             deployer = acct.address
 
-            while True:                                                                                                                                                                          # C) TOKEN MENU (now filtering tokens by chain AND deployer)
+            while True:                                                                                                                                                                          
+                # C) TOKEN MENU (now filtering tokens by chain AND deployer)
                 tokens = list_contract_info(chain_name, deployer)
                 if tokens:
                     print(f"\nFound the following deployed tokens on {chain_name} by {deployer}:")
@@ -488,12 +492,15 @@ def main():
 
                 print("b. Back to chain selection")
                 print("Or press Enter to deploy a new token.")
-                                                                                                                                                                                                 choice = get_input("Select a token index to resume, 'b' to go back, or Enter to deploy new: ", allow_back=True)
-                if choice is None:                                                                                                                                                                   print("Returning to chain selection...\n")
+                                                                                                                                                                                                 
+                choice = get_input("Select a token index to resume, 'b' to go back, or Enter to deploy new: ", allow_back=True)
+                if choice is None:                                                                                                                                                                   
+                    print("Returning to chain selection...\n")
                     break
 
                 if choice == "":
-                    # Deploy new token                                                                                                                                                               token_name = get_input("Enter your smart contract name (or 'b' to go back): ")
+                    # Deploy new token                                                                                                                                                               
+                    token_name = get_input("Enter your smart contract name (or 'b' to go back): ")
                     if token_name is None:
                         print("Returning to token menu...\n")
                         continue
