@@ -248,18 +248,35 @@ def verify_contract(contract_address, name):
     option = input("Do you want to verify the contract? (yes/no): ")
     if option.lower() == "yes":
         print("[+] Verifying Contract...")
-        verify_cmd = [
-            "forge", "verify-contract",
-            contract_address,
-            f"contracts/{name}.sol:{name}",
-            "--rpc-url", RPC_URL,
-            "--verifier", "sourcify",
-            "--verifier-url", "https://sourcify-api-monad.blockvision.org"
-        ]
+        # If the chain configuration includes an ETHERSCAN_API_KEY, use Etherscan verification.
+        if ETHERSCAN_API_KEY:
+            print("[+] Using Etherscan verification for chain:", chain_config["name"])
+            verify_cmd = [
+                "forge", "verify-contract",
+                contract_address,
+                f"contracts/{name}.sol:{name}",
+                "--chain", chain_config["name"],
+                "--etherscan-api-key", ETHERSCAN_API_KEY,
+                "--rpc-url", RPC_URL,
+            ]
+        else:
+            # Use Sourcify as default. You can optionally set VERIFIER_URL in chains.txt.
+            verifier_url = chain_config.get("VERIFIER_URL", "https://sourcify-api-monad.blockvision.org")
+            print("[+] Using Sourcify verification for chain:", chain_config["name"])
+            print("[+] Verifier URL:", verifier_url)
+            verify_cmd = [
+                "forge", "verify-contract",
+                contract_address,
+                f"contracts/{name}.sol:{name}",
+                "--rpc-url", RPC_URL,
+                "--verifier", "sourcify",
+                "--verifier-url", verifier_url
+            ]
         subprocess.run(verify_cmd, check=True)
         print("[✓] Contract Verified")
     else:
         print("[!] Verification Skipped")
+
 
 def prompt_valid_address(message):
     """Prompt the user for an address until a valid Ethereum address is provided."""
