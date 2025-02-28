@@ -1,21 +1,120 @@
 import os
 import subprocess
-from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 
-load_dotenv()
+# --- Helper Functions to Load Configurations ---
 
-# Environment variables and web3 setup
-PRIVATE_KEY = os.getenv("PRIVATE_KEY")
-RPC_URL = os.getenv("RPC_URL")
-CHAIN_ID = int(os.getenv("CHAIN_ID"))
-ETHERSCAN_API_KEY = os.getenv("ETHERSCAN_API_KEY")
+def load_keys(filename="keys.txt"):
+    """
+    Load private keys from keys.txt.
+    Expected format: label=private_key (ignores lines starting with '#' or blank lines).
+    """
+    keys = {}
+    with open(filename, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                label, key_value = line.split("=", 1)
+                keys[label.strip()] = key_value.strip()
+    return keys
+
+def select_key():
+    keys = load_keys()
+    if not keys:
+        print("[!] No keys found in keys.txt")
+        exit(1)
+    key_labels = list(keys.keys())
+    if len(key_labels) == 1:
+        label = key_labels[0]
+        print(f"[✓] Using the only available key: {label}")
+        return keys[label]
+    else:
+        print("\n=== Select Private Key ===")
+        for idx, label in enumerate(key_labels, start=1):
+            print(f"{idx}. {label}")
+        choice = input(f"Select a key (1-{len(key_labels)}): ")
+        try:
+            choice = int(choice)
+            if 1 <= choice <= len(key_labels):
+                selected_label = key_labels[choice - 1]
+                print(f"[✓] Selected key: {selected_label}")
+                return keys[selected_label]
+            else:
+                print("[!] Invalid choice")
+                exit(1)
+        except ValueError:
+            print("[!] Invalid input. Please enter a number.")
+            exit(1)
+
+def load_chains(filename="chains.txt"):
+    """
+    Load chain configurations from chains.txt.
+    Each chain block is separated by a blank line and must include a 'name' field.
+    """
+    chains = {}
+    with open(filename, "r") as f:
+        block = {}
+        for line in f:
+            line = line.strip()
+            # On blank line, save the current block if exists.
+            if not line or line.startswith("#"):
+                if block:
+                    if "name" in block:
+                        chains[block["name"]] = block
+                    block = {}
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                block[key.strip()] = value.strip()
+        # Add the last block if not empty.
+        if block and "name" in block:
+            chains[block["name"]] = block
+    return chains
+
+def select_chain():
+    chains = load_chains()
+    if not chains:
+        print("[!] No chains found in chains.txt")
+        exit(1)
+    chain_names = list(chains.keys())
+    if len(chain_names) == 1:
+        selected = chain_names[0]
+        print(f"[✓] Using the only available chain: {selected}")
+        return chains[selected]
+    else:
+        print("\n=== Select Blockchain Network ===")
+        for idx, name in enumerate(chain_names, start=1):
+            print(f"{idx}. {name}")
+        choice = input(f"Select a chain (1-{len(chain_names)}): ")
+        try:
+            choice = int(choice)
+            if 1 <= choice <= len(chain_names):
+                selected = chain_names[choice - 1]
+                print(f"[✓] Selected chain: {selected}")
+                return chains[selected]
+            else:
+                print("[!] Invalid choice")
+                exit(1)
+        except ValueError:
+            print("[!] Invalid input. Please enter a number.")
+            exit(1)
+
+# --- Set up Environment Variables Using keys.txt and chains.txt ---
+
+PRIVATE_KEY = select_key()
+chain_config = select_chain()
+RPC_URL = chain_config["RPC_URL"]
+CHAIN_ID = int(chain_config["CHAIN_ID"])
+ETHERSCAN_API_KEY = chain_config.get("ETHERSCAN_API_KEY", "")
 
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
 account = Account.from_key(PRIVATE_KEY)
 
-# Smart contract template (no tokens minted on deployment)
+# --- Smart Contract Template ---
+
 CONTRACT_TEMPLATE = '''
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
@@ -44,6 +143,8 @@ contract {name} is ERC20, Ownable {{
 
 # File to save deployed token info; multiple tokens can be stored (one per line in format: tokenName,contractAddress)
 CONTRACT_INFO_FILE = "contract_info.txt"
+
+# --- Functions for Deployment and Post-Deployment Actions ---
 
 def install_foundry_dependencies():
     if not os.path.exists("lib"):
@@ -247,6 +348,8 @@ def list_contract_info():
                         continue
     return tokens
 
+# --- Main Program Execution ---
+
 if __name__ == "__main__":
     install_foundry_dependencies()
 
@@ -276,7 +379,7 @@ if __name__ == "__main__":
             except ValueError:
                 print("Invalid selection. Proceeding to new deployment...")
 
-    # Deploy a new token if not resuming an existing one
+    # Deploy a new token if not resuming an existing one.
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
     generate_contract(name, symbol)
@@ -286,7 +389,7 @@ if __name__ == "__main__":
         store_contract_info(name, contract_address)
         verify_contract(contract_address, name)
         
-        # Outer loop: allow re-entry into post deployment actions
+        # Outer loop: allow re-entry into post deployment actions.
         while True:
             post_deployment_actions(contract_address)
             resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
