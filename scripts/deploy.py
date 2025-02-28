@@ -40,7 +40,7 @@ def load_keys(filename="keys.txt"):
                 keys[label.strip()] = key_value.strip()
     return keys
 
-def select_key()           
+def select_key():  
     """
     Shows a list of private keys from keys.txt and allows the user to pick one.
     The user can also type 'b' to exit the program (since there's no previous menu).
