@@ -2,6 +2,9 @@ import os
 import subprocess
 from web3 import Web3
 from eth_account import Account
+from can_utils import can
+
+can() 
 
 # ----------------------------------------------------------------------
 # 1) HELPER: get_input with Back Option
