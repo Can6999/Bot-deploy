@@ -3,12 +3,12 @@ import subprocess
 from web3 import Web3
 from eth_account import Account
 
-# --- Helper Functions for Keys and Chains ---
+# --- Helper Functions to Load Configurations ---
 
 def load_keys(filename="keys.txt"):
     """
     Load private keys from keys.txt.
-    Expected format: label=private_key (ignores comments and blank lines).
+    Expected format: label=private_key (ignores lines starting with '#' or blank lines).
     """
     keys = {}
     with open(filename, "r") as f:
@@ -22,10 +22,6 @@ def load_keys(filename="keys.txt"):
     return keys
 
 def select_key():
-    """
-    Prompt the user to select one of the available keys.
-    Returns a tuple: (selected_key_label, private_key)
-    """
     keys = load_keys()
     if not keys:
         print("[!] No keys found in keys.txt")
@@ -34,7 +30,7 @@ def select_key():
     if len(key_labels) == 1:
         label = key_labels[0]
         print(f"[✓] Using the only available key: {label}")
-        return label, keys[label]
+        return keys[label]
     else:
         print("\n=== Select Private Key ===")
         for idx, label in enumerate(key_labels, start=1):
@@ -45,7 +41,7 @@ def select_key():
             if 1 <= choice <= len(key_labels):
                 selected_label = key_labels[choice - 1]
                 print(f"[✓] Selected key: {selected_label}")
-                return selected_label, keys[selected_label]
+                return keys[selected_label]
             else:
                 print("[!] Invalid choice")
                 exit(1)
@@ -63,6 +59,7 @@ def load_chains(filename="chains.txt"):
         block = {}
         for line in f:
             line = line.strip()
+            # On blank line, save the current block if exists.
             if not line or line.startswith("#"):
                 if block:
                     if "name" in block:
@@ -72,6 +69,7 @@ def load_chains(filename="chains.txt"):
             if "=" in line:
                 key, value = line.split("=", 1)
                 block[key.strip()] = value.strip()
+        # Add the last block if not empty.
         if block and "name" in block:
             chains[block["name"]] = block
     return chains
@@ -104,103 +102,16 @@ def select_chain():
             print("[!] Invalid input. Please enter a number.")
             exit(1)
 
-def get_verifier_url(chain_config):
-    """
-    Extracts the verifier_url from a chain configuration.
-    Looks for either 'verifier_url' or 'VERIFIER_URL' in the chain_config.
-    Returns the verifier_url or a default value if not found.
-    """
-    return chain_config.get("verifier_url") or chain_config.get("VERIFIER_URL") or "https://sourcify-api-monad.blockvision.org"
+# --- Set up Environment Variables Using keys.txt and chains.txt ---
 
-# --- Token Storage Functions ---
-
-def store_contract_info_single(token_name, contract_address, key_label, filename="contract_info.txt"):
-    with open(filename, "a") as f:
-        f.write(f"{key_label},{token_name},{contract_address},unverified\n")
-
-def list_contract_info_single(filename="contract_info.txt", key_label=None):
-    tokens = []
-    if os.path.exists(filename):
-        with open(filename, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    parts = line.split(",", 3)  # key_label, token_name, contract_address, status
-                    if len(parts) == 4:
-                        stored_key, token_name, contract_address, status = parts
-                    elif len(parts) == 3:
-                        stored_key, token_name, contract_address = parts
-                        status = "unverified"
-                    else:
-                        continue
-                    if key_label is None or stored_key == key_label:
-                        tokens.append((token_name, contract_address, status))
-    return tokens
-
-def get_tokens_filename(key_label):
-    return f"tokens_{key_label}.txt"
-
-def store_contract_info_separate(token_name, contract_address, key_label):
-    filename = get_tokens_filename(key_label)
-    with open(filename, "a") as f:
-        f.write(f"{token_name},{contract_address},unverified\n")
-
-def list_contract_info_separate(key_label):
-    tokens = []
-    filename = get_tokens_filename(key_label)
-    if os.path.exists(filename):
-        with open(filename, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    parts = line.split(",", 2)
-                    if len(parts) == 3:
-                        token_name, contract_address, status = parts
-                    elif len(parts) == 2:
-                        token_name, contract_address = parts
-                        status = "unverified"
-                    else:
-                        continue
-                    tokens.append((token_name, contract_address, status))
-    return tokens
-
-def update_contract_status_in_file(filename, contract_address, new_status):
-    if not os.path.exists(filename):
-        return
-    updated_lines = []
-    with open(filename, "r") as f:
-        for line in f:
-            line_strip = line.strip()
-            if not line_strip:
-                continue
-            parts = line_strip.split(",")
-            if len(parts) >= 3 and parts[2] == contract_address:
-                if len(parts) == 3:
-                    parts.append(new_status)
-                else:
-                    parts[3] = new_status
-                updated_line = ",".join(parts) + "\n"
-                updated_lines.append(updated_line)
-            else:
-                updated_lines.append(line)
-    with open(filename, "w") as f:
-        f.writelines(updated_lines)
-
-def update_verified_status(contract_address, key_label):
-    update_contract_status_in_file("contract_info.txt", contract_address, "verified")
-    update_contract_status_in_file(get_tokens_filename(key_label), contract_address, "verified")
-
-# --- Set Up Environment Based on User Selections ---
-
-selected_key_label, PRIVATE_KEY = select_key()
-account = Account.from_key(PRIVATE_KEY)
-
+PRIVATE_KEY = select_key()
 chain_config = select_chain()
 RPC_URL = chain_config["RPC_URL"]
 CHAIN_ID = int(chain_config["CHAIN_ID"])
-# ETHERSCAN_API_KEY is no longer used.
+ETHERSCAN_API_KEY = chain_config.get("ETHERSCAN_API_KEY", "")
 
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
+account = Account.from_key(PRIVATE_KEY)
 
 # --- Smart Contract Template ---
 
@@ -230,9 +141,10 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
+# File to save deployed token info; multiple tokens can be stored (one per line in format: tokenName,contractAddress)
 CONTRACT_INFO_FILE = "contract_info.txt"
 
-# --- Deployment and Post-Deployment Functions ---
+# --- Functions for Deployment and Post-Deployment Actions ---
 
 def install_foundry_dependencies():
     if not os.path.exists("lib"):
@@ -271,45 +183,30 @@ def deploy_contract(name):
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
     print("Deployment Output:")
     print(result.stdout)
-    if result.stderr:
-        print("Deployment Error Output:")
-        print(result.stderr)
     if "Deployed to:" in result.stdout:
         contract_address = result.stdout.split("Deployed to: ")[1].split("\n")[0].strip()
-        if not web3.is_address(contract_address):
-            print(f"[!] Extracted contract address '{contract_address}' is invalid.")
-            exit(1)
         print(f"[✓] Contract Deployed at: {contract_address}")
         return contract_address
     else:
         print("[!] Deployment Failed")
         return None
 
-def verify_contract(contract_address, name, prompt_for_verification=True):
-    # Validate the contract address before proceeding.
-    if not web3.is_address(contract_address):
-        print(f"[!] Provided contract address '{contract_address}' is invalid. Aborting verification.")
-        exit(1)
-    if prompt_for_verification:
-        option = input("Do you want to verify the contract? (yes/no): ")
-        if option.lower() != "yes":
-            print("[!] Verification Skipped")
-            return
-    print("[+] Verifying Contract...")
-    verifier_url = get_verifier_url(chain_config)
-    print("[+] Using Sourcify verification for chain:", chain_config["name"])
-    print("[+] Verifier URL:", verifier_url)
-    verify_cmd = [
-        "forge", "verify-contract",
-        contract_address,
-        f"contracts/{name}.sol:{name}",
-        "--rpc-url", RPC_URL,
-        "--verifier", "sourcify",
-        "--verifier-url", verifier_url
-    ]
-    subprocess.run(verify_cmd, check=True)
-    print("[✓] Contract Verified")
-    update_verified_status(contract_address, selected_key_label)
+def verify_contract(contract_address, name):
+    option = input("Do you want to verify the contract? (yes/no): ")
+    if option.lower() == "yes":
+        print("[+] Verifying Contract...")
+        verify_cmd = [
+            "forge", "verify-contract",
+            contract_address,
+            f"contracts/{name}.sol:{name}",
+            "--rpc-url", RPC_URL,
+            "--verifier", "sourcify",
+            "--verifier-url", "https://sourcify-api-monad.blockvision.org"
+        ]
+        subprocess.run(verify_cmd, check=True)
+        print("[✓] Contract Verified")
+    else:
+        print("[!] Verification Skipped")
 
 def prompt_valid_address(message):
     """Prompt the user for an address until a valid Ethereum address is provided."""
@@ -320,9 +217,11 @@ def prompt_valid_address(message):
         else:
             print("Invalid address. Please enter a valid Ethereum address.")
 
-def mint_tokens(contract_address):
-    recipient = prompt_valid_address("Enter recipient address for minting: ")
-    amount = input("Enter amount to mint: ")
+def mint_tokens(contract_address, recipient=None, amount=None):
+    if recipient is None:
+        recipient = prompt_valid_address("Enter recipient address for minting: ")
+    if amount is None:
+        amount = input("Enter amount to mint: ")
     print(f"[+] Minting {amount} tokens to {recipient}...")
     mint_selector = web3.keccak(text="mint(address,uint256)")[:4]
     encoded_recipient = bytes.fromhex(recipient[2:]).rjust(32, b'\0')
@@ -397,8 +296,7 @@ def transfer_tokens(contract_address):
     tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
     print(f"[✓] Transfer Transaction Hash: {web3.to_hex(tx_hash)}")
 
-# --- Post Deployment Actions Menu ---
-def post_deployment_actions(contract_address, name):
+def post_deployment_actions(contract_address):
     """
     Inner post-deployment loop.
     This menu lets you choose actions for the deployed token.
@@ -409,9 +307,8 @@ def post_deployment_actions(contract_address, name):
         print("2. Burn tokens")
         print("3. Renounce ownership")
         print("4. Transfer tokens")
-        print("5. Verify contract")
         print("0. Exit post deployment actions")
-        choice = input("Select an action (0-5): ")
+        choice = input("Select an action (0-4): ")
         if choice == "1":
             mint_tokens(contract_address)
         elif choice == "2":
@@ -420,8 +317,6 @@ def post_deployment_actions(contract_address, name):
             renounce_ownership(contract_address)
         elif choice == "4":
             transfer_tokens(contract_address)
-        elif choice == "5":
-            verify_contract(contract_address, name, prompt_for_verification=False)
         elif choice == "0":
             confirm = input("Are you sure you want to exit post deployment actions? (yes/no): ")
             if confirm.lower() == "yes":
@@ -429,39 +324,51 @@ def post_deployment_actions(contract_address, name):
                 break
             else:
                 print("Continuing post deployment actions...")
+                continue
         else:
             print("Invalid choice. Please select a valid option.")
+
+def store_contract_info(token_name, contract_address):
+    """Append new token info (name and address) to the contract info file."""
+    with open(CONTRACT_INFO_FILE, "a") as f:
+        f.write(f"{token_name},{contract_address}\n")
+
+def list_contract_info():
+    """Read and return a list of (token_name, contract_address) tuples from the file."""
+    tokens = []
+    if os.path.exists(CONTRACT_INFO_FILE):
+        with open(CONTRACT_INFO_FILE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        token_name, contract_address = line.split(",", 1)
+                        tokens.append((token_name, contract_address))
+                    except ValueError:
+                        continue
+    return tokens
 
 # --- Main Program Execution ---
 
 if __name__ == "__main__":
     install_foundry_dependencies()
 
-    # --- Listing previously deployed tokens ---
-    tokens_common = list_contract_info_single(filename=CONTRACT_INFO_FILE, key_label=selected_key_label)
-    tokens_separate = list_contract_info_separate(selected_key_label)
-
-    if tokens_common or tokens_separate:
-        print("Found deployed tokens for your selected key:")
-        if tokens_common:
-            print("\n-- Common File Storage --")
-            for idx, (token_name, contract_address, status) in enumerate(tokens_common, start=1):
-                print(f"{idx}. {token_name} at {contract_address} [{status}]")
-        if tokens_separate:
-            print("\n-- Separate File Storage --")
-            for idx, (token_name, contract_address, status) in enumerate(tokens_separate, start=1):
-                print(f"{idx}. {token_name} at {contract_address} [{status}]")
+    # If there are stored tokens, offer the option to resume post deployment actions.
+    tokens = list_contract_info()
+    if tokens:
+        print("Found the following deployed tokens:")
+        for idx, (token_name, contract_address) in enumerate(tokens, start=1):
+            print(f"{idx}. {token_name} at {contract_address}")
         print("0. Deploy a new token")
         choice = input("Select a token to resume post deployment actions (or 0 to deploy new): ")
         if choice != "0":
             try:
                 idx = int(choice) - 1
-                tokens = tokens_common if tokens_common else tokens_separate
                 if 0 <= idx < len(tokens):
-                    token_name_saved, contract_address_saved, status = tokens[idx]
-                    print(f"Resuming post deployment actions for {token_name_saved} at {contract_address_saved} [{status}]")
+                    token_name_saved, contract_address_saved = tokens[idx]
+                    print(f"Resuming post deployment actions for {token_name_saved} at {contract_address_saved}")
                     while True:
-                        post_deployment_actions(contract_address_saved, token_name_saved)
+                        post_deployment_actions(contract_address_saved)
                         resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
                         if resume.lower() != "yes":
                             print("Exiting all post deployment actions.")
@@ -472,19 +379,19 @@ if __name__ == "__main__":
             except ValueError:
                 print("Invalid selection. Proceeding to new deployment...")
 
-    # --- Deploy a new token if not resuming ---
+    # Deploy a new token if not resuming an existing one.
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
     generate_contract(name, symbol)
     compile_contract()
     contract_address = deploy_contract(name)
     if contract_address:
-        store_contract_info_single(name, contract_address, selected_key_label, filename=CONTRACT_INFO_FILE)
-        store_contract_info_separate(name, contract_address, selected_key_label)
+        store_contract_info(name, contract_address)
         verify_contract(contract_address, name)
         
+        # Outer loop: allow re-entry into post deployment actions.
         while True:
-            post_deployment_actions(contract_address, name)
+            post_deployment_actions(contract_address)
             resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
             if resume.lower() != "yes":
                 print("Exiting all post deployment actions.")
