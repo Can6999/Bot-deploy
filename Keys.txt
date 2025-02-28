@@ -1,0 +1,3 @@
+# keys.txt support multiple
+default=0xYOUR_DEFAULT_PRIVATE_KEY
+backup=0xYOUR_BACKUP_PRIVATE_KEY
