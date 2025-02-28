@@ -292,18 +292,9 @@ def verify_contract(contract_address, name, prompt_for_verification=True):
         if option.lower() != "yes":
             print("[!] Verification Skipped")
             return
-    print("[+] Verifying Contract...")
-    if ETHERSCAN_API_KEY:
-        print("[+] Using Etherscan verification for chain:", chain_config["name"])
-        verify_cmd = [
-            "forge", "verify-contract",
-            contract_address,
-            f"contracts/{name}.sol:{name}",
-            "--chain", chain_config["name"],
-            "--etherscan-api-key", ETHERSCAN_API_KEY,
-            "--rpc-url", RPC_URL,
-        ]
-    else:
+    print("[+] Verifying Contract...") 
+          
+    if :
         verifier_url = get_verifier_url(chain_config)
         print("[+] Using Sourcify verification for chain:", chain_config["name"])
         print("[+] Verifier URL:", verifier_url)
