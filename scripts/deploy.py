@@ -276,6 +276,9 @@ def deploy_contract(name):
         print(result.stderr)
     if "Deployed to:" in result.stdout:
         contract_address = result.stdout.split("Deployed to: ")[1].split("\n")[0].strip()
+        if not web3.is_address(contract_address):
+            print(f"[!] Extracted contract address '{contract_address}' is invalid.")
+            exit(1)
         print(f"[✓] Contract Deployed at: {contract_address}")
         return contract_address
     else:
@@ -283,10 +286,10 @@ def deploy_contract(name):
         return None
 
 def verify_contract(contract_address, name, prompt_for_verification=True):
-    """
-    Verify the contract using Sourcify verification.
-    If prompt_for_verification is True, ask the user before verifying.
-    """
+    # Validate the contract address before proceeding.
+    if not web3.is_address(contract_address):
+        print(f"[!] Provided contract address '{contract_address}' is invalid. Aborting verification.")
+        exit(1)
     if prompt_for_verification:
         option = input("Do you want to verify the contract? (yes/no): ")
         if option.lower() != "yes":
