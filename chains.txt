@@ -1,0 +1,15 @@
+# chains.txt - multiple chain definitions separated by a blank line
+# Follow this format to input
+name=Monad Testnet
+RPC_URL=https://testnet-rpc.monad.xyz
+CHAIN_ID=10143
+ETHERSCAN_API_KEY=https://sourcify-api-monad.blockvision.org
+
+name=Rome Testnet
+RPC_URL=https://rome.testnet.romeprotocol.xyz
+CHAIN_ID=200018
+ETHERSCAN_API_KEY=https://node2.testnet.romeprotocol.xyz:1000/
+
+name=Sepolia
+RPC_URL=https://rpc.sepolia.org
+ETHERSCAN_API_KEY=https://api-sepolia.etherscan.io/api
