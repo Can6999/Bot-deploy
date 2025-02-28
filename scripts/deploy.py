@@ -3,12 +3,12 @@ import subprocess
 from web3 import Web3
 from eth_account import Account
 
-# --- Helper Functions to Load Configurations ---
+# --- Helper Functions for Keys and Chains ---
 
 def load_keys(filename="keys.txt"):
     """
     Load private keys from keys.txt.
-    Expected format: label=private_key (ignores lines starting with '#' or blank lines).
+    Expected format: label=private_key (ignores comments and blank lines).
     """
     keys = {}
     with open(filename, "r") as f:
@@ -22,6 +22,10 @@ def load_keys(filename="keys.txt"):
     return keys
 
 def select_key():
+    """
+    Prompt the user to select one of the available keys.
+    Returns a tuple: (selected_key_label, private_key)
+    """
     keys = load_keys()
     if not keys:
         print("[!] No keys found in keys.txt")
@@ -30,7 +34,7 @@ def select_key():
     if len(key_labels) == 1:
         label = key_labels[0]
         print(f"[✓] Using the only available key: {label}")
-        return keys[label]
+        return label, keys[label]
     else:
         print("\n=== Select Private Key ===")
         for idx, label in enumerate(key_labels, start=1):
@@ -41,7 +45,7 @@ def select_key():
             if 1 <= choice <= len(key_labels):
                 selected_label = key_labels[choice - 1]
                 print(f"[✓] Selected key: {selected_label}")
-                return keys[selected_label]
+                return selected_label, keys[selected_label]
             else:
                 print("[!] Invalid choice")
                 exit(1)
@@ -59,7 +63,6 @@ def load_chains(filename="chains.txt"):
         block = {}
         for line in f:
             line = line.strip()
-            # On blank line, save the current block if exists.
             if not line or line.startswith("#"):
                 if block:
                     if "name" in block:
@@ -69,7 +72,6 @@ def load_chains(filename="chains.txt"):
             if "=" in line:
                 key, value = line.split("=", 1)
                 block[key.strip()] = value.strip()
-        # Add the last block if not empty.
         if block and "name" in block:
             chains[block["name"]] = block
     return chains
@@ -102,16 +104,64 @@ def select_chain():
             print("[!] Invalid input. Please enter a number.")
             exit(1)
 
-# --- Set up Environment Variables Using keys.txt and chains.txt ---
+# --- Token Storage Functions ---
 
-PRIVATE_KEY = select_key()
+# Option 1: Store in a common file (contract_info.txt) with the key label.
+def store_contract_info_single(token_name, contract_address, key_label, filename="contract_info.txt"):
+    with open(filename, "a") as f:
+        f.write(f"{key_label},{token_name},{contract_address}\n")
+
+def list_contract_info_single(filename="contract_info.txt", key_label=None):
+    tokens = []
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    parts = line.split(",", 2)  # key_label, token_name, contract_address
+                    if len(parts) == 3:
+                        stored_key, token_name, contract_address = parts
+                        if key_label is None or stored_key == key_label:
+                            tokens.append((token_name, contract_address))
+    return tokens
+
+# Option 2: Store tokens in a separate file for each key.
+def get_tokens_filename(key_label):
+    return f"tokens_{key_label}.txt"
+
+def store_contract_info_separate(token_name, contract_address, key_label):
+    filename = get_tokens_filename(key_label)
+    with open(filename, "a") as f:
+        f.write(f"{token_name},{contract_address}\n")
+
+def list_contract_info_separate(key_label):
+    tokens = []
+    filename = get_tokens_filename(key_label)
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        token_name, contract_address = line.split(",", 1)
+                        tokens.append((token_name, contract_address))
+                    except ValueError:
+                        continue
+    return tokens
+
+# --- Set Up Environment Based on User Selections ---
+
+# Select the private key (returns label and key)
+selected_key_label, PRIVATE_KEY = select_key()
+account = Account.from_key(PRIVATE_KEY)
+
+# Select the chain configuration.
 chain_config = select_chain()
 RPC_URL = chain_config["RPC_URL"]
 CHAIN_ID = int(chain_config["CHAIN_ID"])
 ETHERSCAN_API_KEY = chain_config.get("ETHERSCAN_API_KEY", "")
 
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
-account = Account.from_key(PRIVATE_KEY)
 
 # --- Smart Contract Template ---
 
@@ -141,10 +191,10 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
-# File to save deployed token info; multiple tokens can be stored (one per line in format: tokenName,contractAddress)
+# File to save deployed token info for the common file approach.
 CONTRACT_INFO_FILE = "contract_info.txt"
 
-# --- Functions for Deployment and Post-Deployment Actions ---
+# --- Deployment and Post-Deployment Functions (unchanged) ---
 
 def install_foundry_dependencies():
     if not os.path.exists("lib"):
@@ -328,42 +378,34 @@ def post_deployment_actions(contract_address):
         else:
             print("Invalid choice. Please select a valid option.")
 
-def store_contract_info(token_name, contract_address):
-    """Append new token info (name and address) to the contract info file."""
-    with open(CONTRACT_INFO_FILE, "a") as f:
-        f.write(f"{token_name},{contract_address}\n")
-
-def list_contract_info():
-    """Read and return a list of (token_name, contract_address) tuples from the file."""
-    tokens = []
-    if os.path.exists(CONTRACT_INFO_FILE):
-        with open(CONTRACT_INFO_FILE, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        token_name, contract_address = line.split(",", 1)
-                        tokens.append((token_name, contract_address))
-                    except ValueError:
-                        continue
-    return tokens
-
 # --- Main Program Execution ---
 
 if __name__ == "__main__":
     install_foundry_dependencies()
 
-    # If there are stored tokens, offer the option to resume post deployment actions.
-    tokens = list_contract_info()
-    if tokens:
-        print("Found the following deployed tokens:")
-        for idx, (token_name, contract_address) in enumerate(tokens, start=1):
-            print(f"{idx}. {token_name} at {contract_address}")
+    # --- Listing previously deployed tokens ---
+    # Option 1: From common file
+    tokens_common = list_contract_info_single(filename=CONTRACT_INFO_FILE, key_label=selected_key_label)
+    # Option 2: From separate file
+    tokens_separate = list_contract_info_separate(selected_key_label)
+
+    if tokens_common or tokens_separate:
+        print("Found deployed tokens for your selected key:")
+        if tokens_common:
+            print("\n-- Common File Storage --")
+            for idx, (token_name, contract_address) in enumerate(tokens_common, start=1):
+                print(f"{idx}. {token_name} at {contract_address}")
+        if tokens_separate:
+            print("\n-- Separate File Storage --")
+            for idx, (token_name, contract_address) in enumerate(tokens_separate, start=1):
+                print(f"{idx}. {token_name} at {contract_address}")
         print("0. Deploy a new token")
         choice = input("Select a token to resume post deployment actions (or 0 to deploy new): ")
         if choice != "0":
             try:
                 idx = int(choice) - 1
+                # Prioritize common file tokens if available; otherwise, separate file tokens.
+                tokens = tokens_common if tokens_common else tokens_separate
                 if 0 <= idx < len(tokens):
                     token_name_saved, contract_address_saved = tokens[idx]
                     print(f"Resuming post deployment actions for {token_name_saved} at {contract_address_saved}")
@@ -379,14 +421,16 @@ if __name__ == "__main__":
             except ValueError:
                 print("Invalid selection. Proceeding to new deployment...")
 
-    # Deploy a new token if not resuming an existing one.
+    # --- Deploy a new token if not resuming ---
     name = input("Enter your smart contract name: ").replace(" ", "_")
     symbol = input("Enter your token symbol: ")
     generate_contract(name, symbol)
     compile_contract()
     contract_address = deploy_contract(name)
     if contract_address:
-        store_contract_info(name, contract_address)
+        # Save token info using both approaches.
+        store_contract_info_single(name, contract_address, selected_key_label, filename=CONTRACT_INFO_FILE)
+        store_contract_info_separate(name, contract_address, selected_key_label)
         verify_contract(contract_address, name)
         
         # Outer loop: allow re-entry into post deployment actions.
