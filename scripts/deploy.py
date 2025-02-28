@@ -487,6 +487,7 @@ def main():
                     print(f"\nFound the following deployed tokens on {chain_name} by {deployer}:")
                     for idx, (tname, taddr, status) in enumerate(tokens, start=1):
                         print(f"{idx}. {tname} at {taddr} [{status}]")
+                        
                 else:
                 print(f"\nNo tokens found on {chain_name} yet for deployer {deployer}.")
 
