@@ -3,13 +3,32 @@ import subprocess
 from web3 import Web3
 from eth_account import Account
 
-# --- Helper Functions to Load Configurations ---
+# ----------------------------------------------------------------------
+# 1) HELPER: get_input with Back Option
+# ----------------------------------------------------------------------
+
+def get_input(prompt, allow_back=True):
+    """
+    Prompts the user for input. If allow_back=True and the user types
+    'b' or 'back', return None to signal a 'go back' request.
+    """
+    user_input = input(prompt).strip()
+    if allow_back and user_input.lower() in ['b', 'back']:
+        return None
+    return user_input
+
+# ----------------------------------------------------------------------
+# 2) LOAD KEY & CHAIN CONFIGS
+# ----------------------------------------------------------------------
 
 def load_keys(filename="keys.txt"):
     """
     Load private keys from keys.txt.
-    Expected format: label=private_key (ignores lines starting with '#' or blank lines).
+    Expected format: label=private_key
+    Lines starting with '#' or blank lines are ignored.
     """
+    if not os.path.exists(filename):
+        return {}
     keys = {}
     with open(filename, "r") as f:
         for line in f:
@@ -21,45 +40,48 @@ def load_keys(filename="keys.txt"):
                 keys[label.strip()] = key_value.strip()
     return keys
 
-def select_key():
-    keys = load_keys()
-    if not keys:
-        print("[!] No keys found in keys.txt")
-        exit(1)
-    key_labels = list(keys.keys())
-    if len(key_labels) == 1:
-        label = key_labels[0]
-        print(f"[✓] Using the only available key: {label}")
-        return keys[label]
-    else:
+def select_key():                                                                           """
+    Shows a list of private keys from keys.txt and allows the user to pick one.
+    The user can also type 'b' to exit the program (since there's no previous menu).
+    Returns the selected private key string or None if the user typed 'b'.
+    """                                                                                     while True:
+        keys = load_keys()
+        if not keys:
+            print("[!] No keys found in keys.txt")
+            exit(1)
+            
+        key_labels = list(keys.keys())
         print("\n=== Select Private Key ===")
         for idx, label in enumerate(key_labels, start=1):
             print(f"{idx}. {label}")
-        choice = input(f"Select a key (1-{len(key_labels)}): ")
+        print("b. Back (Exit Program)")
+
+        choice = get_input(f"Select a key (1-{len(key_labels)}) or 'b' to exit: ")
+        if choice is None:                                                                          return None
+
         try:
-            choice = int(choice)
-            if 1 <= choice <= len(key_labels):
-                selected_label = key_labels[choice - 1]
+            idx = int(choice)
+            if 1 <= idx <= len(key_labels):                                                             selected_label = key_labels[idx - 1]
                 print(f"[✓] Selected key: {selected_label}")
                 return keys[selected_label]
             else:
-                print("[!] Invalid choice")
-                exit(1)
+                print("[!] Invalid choice. Please try again.")
         except ValueError:
-            print("[!] Invalid input. Please enter a number.")
-            exit(1)
+            print("[!] Invalid input. Please enter a number or 'b' to exit.")
 
 def load_chains(filename="chains.txt"):
     """
     Load chain configurations from chains.txt.
     Each chain block is separated by a blank line and must include a 'name' field.
     """
+    if not os.path.exists(filename):
+        return {}
+
     chains = {}
     with open(filename, "r") as f:
         block = {}
         for line in f:
             line = line.strip()
-            # On blank line, save the current block if exists.
             if not line or line.startswith("#"):
                 if block:
                     if "name" in block:
@@ -69,51 +91,46 @@ def load_chains(filename="chains.txt"):
             if "=" in line:
                 key, value = line.split("=", 1)
                 block[key.strip()] = value.strip()
-        # Add the last block if not empty.
         if block and "name" in block:
             chains[block["name"]] = block
     return chains
 
 def select_chain():
-    chains = load_chains()
-    if not chains:
-        print("[!] No chains found in chains.txt")
-        exit(1)
-    chain_names = list(chains.keys())
-    if len(chain_names) == 1:
-        selected = chain_names[0]
-        print(f"[✓] Using the only available chain: {selected}")
-        return chains[selected]
-    else:
+    """
+    Display a list of chains and let the user select one.
+    The user may type 'b' to go back to key selection.
+    Returns the chain config dict or None if user typed 'b'.
+    """
+    while True:
+        chains = load_chains()
+        if not chains:
+            print("[!] No chains found in chains.txt")
+            exit(1)
+
+        chain_names = list(chains.keys())
         print("\n=== Select Blockchain Network ===")
         for idx, name in enumerate(chain_names, start=1):
             print(f"{idx}. {name}")
-        choice = input(f"Select a chain (1-{len(chain_names)}): ")
+        print("b. Back (to Private Key selection)")
+
+        choice = get_input(f"Select a chain (1-{len(chain_names)}) or 'b' to go back: ")
+        if choice is None:
+            return None
+
         try:
-            choice = int(choice)
-            if 1 <= choice <= len(chain_names):
-                selected = chain_names[choice - 1]
-                print(f"[✓] Selected chain: {selected}")
-                return chains[selected]
+            idx = int(choice)
+            if 1 <= idx <= len(chain_names):
+                selected_name = chain_names[idx - 1]
+                print(f"[✓] Selected chain: {selected_name}")
+                return chains[selected_name]
             else:
-                print("[!] Invalid choice")
-                exit(1)
+                print("[!] Invalid choice. Please try again.")
         except ValueError:
-            print("[!] Invalid input. Please enter a number.")
-            exit(1)
+            print("[!] Invalid input. Please enter a number or 'b' to go back.")
 
-# --- Set up Environment Variables Using keys.txt and chains.txt ---
-
-PRIVATE_KEY = select_key()
-chain_config = select_chain()
-RPC_URL = chain_config["RPC_URL"]
-CHAIN_ID = int(chain_config["CHAIN_ID"])
-ETHERSCAN_API_KEY = chain_config.get("ETHERSCAN_API_KEY", "")
-
-web3 = Web3(Web3.HTTPProvider(RPC_URL))
-account = Account.from_key(PRIVATE_KEY)
-
-# --- Smart Contract Template ---
+# ----------------------------------------------------------------------
+# 3) SMART CONTRACT TEMPLATE
+# ----------------------------------------------------------------------
 
 CONTRACT_TEMPLATE = '''
 // SPDX-License-Identifier: MIT
@@ -141,10 +158,11 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
-# File to save deployed token info; multiple tokens can be stored (one per line in format: tokenName,contractAddress)
 CONTRACT_INFO_FILE = "contract_info.txt"
 
-# --- Functions for Deployment and Post-Deployment Actions ---
+# ----------------------------------------------------------------------
+# 4) DEPLOYMENT / VERIFICATION / POST-DEPLOYMENT
+# ----------------------------------------------------------------------
 
 def install_foundry_dependencies():
     if not os.path.exists("lib"):
@@ -156,33 +174,32 @@ def install_foundry_dependencies():
 
 def generate_contract(name, symbol):
     print(f"[+] Generating {name} Smart Contract...")
-    contract_code = CONTRACT_TEMPLATE.format(name=name, symbol=symbol)
+    code = CONTRACT_TEMPLATE.format(name=name, symbol=symbol)
     os.makedirs("contracts", exist_ok=True)
     with open(f"contracts/{name}.sol", "w") as file:
-        file.write(contract_code)
+        file.write(code)
     print(f"[✓] Contract {name}.sol Generated")
 
 def compile_contract():
     print("[+] Compiling Contract...")
     if os.path.exists("out"):
-        print("[+] Cleaning previous build files...")
+        print("[+] Removing previous build files...")
         subprocess.run(["rm", "-rf", "out"])
-    subprocess.run(["forge", "build"], check=True)
+        subprocess.run(["forge", "build"], check=True)
     print("[✓] Compilation Done")
 
-def deploy_contract(name):
+def deploy_contract(rpc_url, private_key, name):
     print("[+] Deploying Contract...")
     deploy_cmd = [
         "forge", "create",
-        "--rpc-url", RPC_URL,
-        "--private-key", PRIVATE_KEY,
+        "--rpc-url", rpc_url,
+        "--private-key", private_key,
         "--broadcast",
         "--force",
         f"contracts/{name}.sol:{name}"
     ]
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
-    print("Deployment Output:")
-    print(result.stdout)
+    print("Deployment Output:")                                                                                                                             print(result.stdout)
     if "Deployed to:" in result.stdout:
         contract_address = result.stdout.split("Deployed to: ")[1].split("\n")[0].strip()
         print(f"[✓] Contract Deployed at: {contract_address}")
@@ -191,95 +208,204 @@ def deploy_contract(name):
         print("[!] Deployment Failed")
         return None
 
-def verify_contract(contract_address, name):
-    option = input("Do you want to verify the contract? (yes/no): ")
-    if option.lower() == "yes":
-        print("[+] Verifying Contract...")
+# ----------------------------------------------------------------------
+# 5) STORING & UPDATING TOKEN INFO (with deployer field)
+# ----------------------------------------------------------------------
+
+def store_contract_info(chain_name, token_name, contract_address, deployer, verified_status="unverified"):
+    """
+    Append new token info to contract_info.txt in the format:
+    chainName,tokenName,contractAddress,verificationStatus,deployerAddress
+    """
+    with open(CONTRACT_INFO_FILE, "a") as f:
+        f.write(f"{chain_name},{token_name},{contract_address},{verified_status},{deployer}\n")
+
+def list_contract_info(chain_name, deployer):
+    """
+    Return a list of (token_name, contract_address, verification_status)
+    for tokens on the given chain_name deployed by the given deployer.
+    """
+    tokens = []
+    if os.path.exists(CONTRACT_INFO_FILE):
+        with open(CONTRACT_INFO_FILE, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    parts = line.split(",")
+                    if len(parts) == 5:
+                        stored_chain, token_name, contract_address, status, token_deployer = parts
+                        if stored_chain == chain_name and token_deployer.lower() == deployer.lower():
+                            tokens.append((token_name, contract_address, status))
+    return tokens
+
+def update_verification_status(chain_name, token_name, contract_address, deployer, new_status):
+    if not os.path.exists(CONTRACT_INFO_FILE):
+        return
+    lines = []
+    with open(CONTRACT_INFO_FILE, "r") as f:
+        for line in f:
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            parts = line_stripped.split(",")
+            if len(parts) == 5:
+                c, t, addr, s, d = parts
+                if c == chain_name and t == token_name and addr.lower() == contract_address.lower() and d.lower() == deployer.lower():
+                    lines.append(f"{c},{t},{addr},{new_status},{d}")
+                else:
+                    lines.append(line_stripped)
+            else:
+                lines.append(line_stripped)
+    with open(CONTRACT_INFO_FILE, "w") as f:
+        for l in lines:
+            f.write(l + "\n")
+
+# ----------------------------------------------------------------------
+# 6) VERIFICATION & POST-DEPLOYMENT ACTIONS
+# ----------------------------------------------------------------------
+
+def verify_contract(rpc_url, chain_config, token_name, contract_address, deployer):
+    """
+    Verify the contract.
+    If the chain is 'monad', use the custom Sourcify endpoint and source location 'src/<token_name>.sol'.
+    Otherwise, use Etherscan verification.
+    """
+    chain_name = chain_config["name"]
+    chain_id = str(chain_config["CHAIN_ID"])
+    choice = get_input("Do you want to verify the contract? (yes/no or 'b' to go back): ")
+    if choice is None:
+        print("[!] Skipping verification. Going back.")
+        return
+    if choice.lower() != "yes":
+        print("[!] Verification Skipped")
+        return
+
+    print("[+] Verifying Contract...")
+
+    if "monad" in chain_name.lower():
+        # For Monad, use the updated command: note the source file path is in "contracts/"
         verify_cmd = [
             "forge", "verify-contract",
             contract_address,
-            f"contracts/{name}.sol:{name}",
-            "--rpc-url", RPC_URL,
+            f"contracts/{token_name}.sol:{token_name}",
+            "--rpc-url", rpc_url,
+            "--chain-id", chain_id,
             "--verifier", "sourcify",
             "--verifier-url", "https://sourcify-api-monad.blockvision.org"
         ]
-        subprocess.run(verify_cmd, check=True)
-        print("[✓] Contract Verified")
     else:
-        print("[!] Verification Skipped")
+        verifier = "etherscan"
+        etherscan_api_key = chain_config["ETHERSCAN_API_KEY"]
+        etherscan_api_url = chain_config.get("ETHERSCAN_API_URL", "")
+        verify_cmd = [
+            "forge", "verify-contract",
+            contract_address,
+            f"contracts/{token_name}.sol:{token_name}",
+            "--rpc-url", rpc_url,
+            "--verifier", verifier,
+            "--etherscan-api-key", etherscan_api_key,
+            "--chain-id", chain_id,
+        ]
+        if etherscan_api_url:
+            verify_cmd += ["--etherscan-api-url", etherscan_api_url]
 
-def prompt_valid_address(message):
-    """Prompt the user for an address until a valid Ethereum address is provided."""
+    result = subprocess.run(verify_cmd, capture_output=True, text=True)
+    print("Verification Output:")
+    print(result.stdout)
+    if result.stderr:
+        print("Verification Error:")
+        print(result.stderr)
+
+    if result.returncode == 0:
+        print(f"[✓] Contract Verified on {chain_name}")
+        update_verification_status(chain_name, token_name, contract_address, deployer, "verified")
+    else:
+        print("[!] Verification failed. Check the error messages above.")
+
+def init_web3(rpc_url, private_key):
+    w3 = Web3(Web3.HTTPProvider(rpc_url))
+    acct = Account.from_key(private_key)
+    return w3, acct
+
+def prompt_valid_address(w3, prompt_msg):
     while True:
-        addr = input(message).strip()
-        if web3.is_address(addr):
-            return web3.to_checksum_address(addr)
+        addr = get_input(prompt_msg)
+        if addr is None:
+            return None
+        if w3.is_address(addr):
+            return w3.to_checksum_address(addr)
         else:
-            print("Invalid address. Please enter a valid Ethereum address.")
+            print("Invalid address. Please enter a valid Ethereum address or 'b' to go back.")
 
-def mint_tokens(contract_address, recipient=None, amount=None):
+def mint_tokens(w3, acct, chain_id, contract_address, private_key):
+    recipient = prompt_valid_address(w3, "Enter recipient address (or 'b' to go back): ")
     if recipient is None:
-        recipient = prompt_valid_address("Enter recipient address for minting: ")
+        return
+    amount = get_input("Enter amount to mint (or 'b' to go back): ")
     if amount is None:
-        amount = input("Enter amount to mint: ")
+        return
     print(f"[+] Minting {amount} tokens to {recipient}...")
-    mint_selector = web3.keccak(text="mint(address,uint256)")[:4]
+    mint_selector = w3.keccak(text="mint(address,uint256)")[:4]
     encoded_recipient = bytes.fromhex(recipient[2:]).rjust(32, b'\0')
     encoded_amount = int(amount).to_bytes(32, 'big')
     data = mint_selector + encoded_recipient + encoded_amount
     tx = {
-        "to": contract_address,
-        "data": data,
+        "to": contract_address,                                                                                                                                                          "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
-        "chainId": CHAIN_ID,
-        "nonce": web3.eth.get_transaction_count(account.address),
+        "maxFeePerGas": w3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": w3.to_wei("50", "gwei"),
+        "chainId": chain_id,
+        "nonce": w3.eth.get_transaction_count(acct.address),
     }
-    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
-    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-    print(f"[✓] Mint Transaction Hash: {web3.to_hex(tx_hash)}")
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Mint Transaction Hash: {w3.to_hex(tx_hash)}")
 
-def burn_tokens(contract_address):
-    amount = input("Enter amount to burn: ")
+def burn_tokens(w3, acct, chain_id, contract_address, private_key):
+    amount = get_input("Enter amount to burn (or 'b' to go back): ")
+    if amount is None:
+        return
     print(f"[+] Burning {amount} tokens...")
-    burn_selector = web3.keccak(text="burn(uint256)")[:4]
-    encoded_amount = int(amount).to_bytes(32, 'big')
-    data = burn_selector + encoded_amount
+    burn_selector = w3.keccak(text="burn(uint256)")[:4]
+    encoded_amount = int(amount).to_bytes(32, 'big')                                                                                                                                 data = burn_selector + encoded_amount
     tx = {
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
-        "chainId": CHAIN_ID,
-        "nonce": web3.eth.get_transaction_count(account.address),
-    }
-    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
-    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-    print(f"[✓] Burn Transaction Hash: {web3.to_hex(tx_hash)}")
+        "maxFeePerGas": w3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": w3.to_wei("50", "gwei"),
+        "chainId": chain_id,
+        "nonce": w3.eth.get_transaction_count(acct.address),
+        }
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Burn Transaction Hash: {w3.to_hex(tx_hash)}")
 
-def renounce_ownership(contract_address):
+def renounce_ownership(w3, acct, chain_id, contract_address, private_key):
     print("[+] Renouncing Ownership...")
-    renounce_selector = web3.keccak(text="renounce()")[:4]
+    renounce_selector = w3.keccak(text="renounce()")[:4]
     tx = {
         "to": contract_address,
         "data": renounce_selector,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
-        "chainId": CHAIN_ID,
-        "nonce": web3.eth.get_transaction_count(account.address),
+        "maxFeePerGas": w3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": w3.to_wei("50", "gwei"),
+        "chainId": chain_id,
+        "nonce": w3.eth.get_transaction_count(acct.address),
     }
-    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
-    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-    print(f"[✓] Renounce Ownership Transaction Hash: {web3.to_hex(tx_hash)}")
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Renounce Ownership Transaction Hash: {w3.to_hex(tx_hash)}")
 
-def transfer_tokens(contract_address):
-    recipient = prompt_valid_address("Enter the recipient address: ")
-    amount = input("Enter the amount to transfer: ")
+def transfer_tokens(w3, acct, chain_id, contract_address, private_key):
+    recipient = prompt_valid_address(w3, "Enter the recipient address (or 'b' to go back): ")
+    if recipient is None:
+        return
+    amount = get_input("Enter the amount to transfer (or 'b' to go back): ")
+    if amount is None:
+        return
     print(f"[+] Transferring {amount} tokens to {recipient}...")
-    transfer_selector = web3.keccak(text="transfer(address,uint256)")[:4]
+    transfer_selector = w3.keccak(text="transfer(address,uint256)")[:4]
     encoded_recipient = bytes.fromhex(recipient[2:]).rjust(32, b'\0')
     encoded_amount = int(amount).to_bytes(32, 'big')
     data = transfer_selector + encoded_recipient + encoded_amount
@@ -287,112 +413,130 @@ def transfer_tokens(contract_address):
         "to": contract_address,
         "data": data,
         "gas": 100000,
-        "maxFeePerGas": web3.to_wei("57", "gwei"),
-        "maxPriorityFeePerGas": web3.to_wei("50", "gwei"),
-        "chainId": CHAIN_ID,
-        "nonce": web3.eth.get_transaction_count(account.address),
+        "maxFeePerGas": w3.to_wei("57", "gwei"),
+        "maxPriorityFeePerGas": w3.to_wei("50", "gwei"),
+        "chainId": chain_id,
+        "nonce": w3.eth.get_transaction_count(acct.address),
     }
-    signed_tx = web3.eth.account.sign_transaction(tx, PRIVATE_KEY)
-    tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
-    print(f"[✓] Transfer Transaction Hash: {web3.to_hex(tx_hash)}")
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    print(f"[✓] Transfer Transaction Hash: {w3.to_hex(tx_hash)}")
 
-def post_deployment_actions(contract_address):
-    """
-    Inner post-deployment loop.
-    This menu lets you choose actions for the deployed token.
-    """
+def post_deployment_actions(w3, acct, chain_id, contract_address, private_key):
     while True:
         print("\n=== Post Deployment Actions ===")
         print("1. Mint tokens")
         print("2. Burn tokens")
         print("3. Renounce ownership")
         print("4. Transfer tokens")
-        print("0. Exit post deployment actions")
-        choice = input("Select an action (0-4): ")
+        print("b. Back to previous menu")
+        choice = get_input("Select an action (1-4) or 'b' to go back: ")
+        if choice is None:
+            print("Returning to previous menu...")
+            break
         if choice == "1":
-            mint_tokens(contract_address)
+            mint_tokens(w3, acct, chain_id, contract_address, private_key)
         elif choice == "2":
-            burn_tokens(contract_address)
+            burn_tokens(w3, acct, chain_id, contract_address, private_key)
         elif choice == "3":
-            renounce_ownership(contract_address)
+            renounce_ownership(w3, acct, chain_id, contract_address, private_key)
         elif choice == "4":
-            transfer_tokens(contract_address)
-        elif choice == "0":
-            confirm = input("Are you sure you want to exit post deployment actions? (yes/no): ")
-            if confirm.lower() == "yes":
-                print("Exiting current post deployment session...")
-                break
-            else:
-                print("Continuing post deployment actions...")
-                continue
+            transfer_tokens(w3, acct, chain_id, contract_address, private_key)
         else:
-            print("Invalid choice. Please select a valid option.")
+            print("[!] Invalid choice. Please select a valid option.")
 
-def store_contract_info(token_name, contract_address):
-    """Append new token info (name and address) to the contract info file."""
-    with open(CONTRACT_INFO_FILE, "a") as f:
-        f.write(f"{token_name},{contract_address}\n")
+# ----------------------------------------------------------------------
+# 7) MAIN PROGRAM: NESTED LOOPS
+# ----------------------------------------------------------------------
 
-def list_contract_info():
-    """Read and return a list of (token_name, contract_address) tuples from the file."""
-    tokens = []
-    if os.path.exists(CONTRACT_INFO_FILE):
-        with open(CONTRACT_INFO_FILE, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        token_name, contract_address = line.split(",", 1)
-                        tokens.append((token_name, contract_address))
-                    except ValueError:
-                        continue
-    return tokens
-
-# --- Main Program Execution ---
-
-if __name__ == "__main__":
+def main():
     install_foundry_dependencies()
 
-    # If there are stored tokens, offer the option to resume post deployment actions.
-    tokens = list_contract_info()
-    if tokens:
-        print("Found the following deployed tokens:")
-        for idx, (token_name, contract_address) in enumerate(tokens, start=1):
-            print(f"{idx}. {token_name} at {contract_address}")
-        print("0. Deploy a new token")
-        choice = input("Select a token to resume post deployment actions (or 0 to deploy new): ")
-        if choice != "0":
-            try:
-                idx = int(choice) - 1
-                if 0 <= idx < len(tokens):
-                    token_name_saved, contract_address_saved = tokens[idx]
-                    print(f"Resuming post deployment actions for {token_name_saved} at {contract_address_saved}")
-                    while True:
-                        post_deployment_actions(contract_address_saved)
-                        resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
-                        if resume.lower() != "yes":
-                            print("Exiting all post deployment actions.")
-                            break
-                    exit()
-                else:
-                    print("Invalid selection. Proceeding to new deployment...")
-            except ValueError:
-                print("Invalid selection. Proceeding to new deployment...")
+    while True:
+        # A) KEY SELECTION
+        private_key = select_key()
+        if private_key is None:
+            print("Exiting program. Goodbye!")
+            return
 
-    # Deploy a new token if not resuming an existing one.
-    name = input("Enter your smart contract name: ").replace(" ", "_")
-    symbol = input("Enter your token symbol: ")
-    generate_contract(name, symbol)
-    compile_contract()
-    contract_address = deploy_contract(name)
-    if contract_address:
-        store_contract_info(name, contract_address)
-        verify_contract(contract_address, name)
-        
-        # Outer loop: allow re-entry into post deployment actions.
         while True:
-            post_deployment_actions(contract_address)
-            resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
-            if resume.lower() != "yes":
-                print("Exiting all post deployment actions.")
-                break
+            # B) CHAIN SELECTION
+            chain_config = select_chain()
+            if chain_config is None:
+                print("Returning to key selection...\n")
+                break                                                                                                                                                            
+            rpc_url = chain_config["RPC_URL"]
+            chain_id = int(chain_config["CHAIN_ID"])
+            chain_name = chain_config["name"]
+
+            # Initialize web3 + account (deployer)
+            w3, acct = init_web3(rpc_url, private_key)
+            deployer = acct.address
+
+            while True:                                                                                                                                                                          # C) TOKEN MENU (now filtering tokens by chain AND deployer)
+                tokens = list_contract_info(chain_name, deployer)
+                if tokens:
+                    print(f"\nFound the following deployed tokens on {chain_name} by {deployer}:")
+                    for idx, (tname, taddr, status) in enumerate(tokens, start=1):
+                        print(f"{idx}. {tname} at {taddr} [{status}]")
+                else:
+                print(f"\nNo tokens found on {chain_name} yet for deployer {deployer}.")
+
+                print("b. Back to chain selection")
+                print("Or press Enter to deploy a new token.")
+                                                                                                                                                                                                 choice = get_input("Select a token index to resume, 'b' to go back, or Enter to deploy new: ", allow_back=True)
+                if choice is None:                                                                                                                                                                   print("Returning to chain selection...\n")
+                    break
+
+                if choice == "":
+                    # Deploy new token                                                                                                                                                               token_name = get_input("Enter your smart contract name (or 'b' to go back): ")
+                    if token_name is None:
+                        print("Returning to token menu...\n")
+                        continue
+                    token_name = token_name.replace(" ", "_")
+
+                    symbol = get_input("Enter your token symbol (or 'b' to go back): ")
+                    if symbol is None:
+                        print("Returning to token menu...\n")
+                        continue
+
+                    generate_contract(token_name, symbol)
+                    compile_contract()
+                    contract_address = deploy_contract(rpc_url, private_key, token_name)
+                    if contract_address:
+                        store_contract_info(chain_name, token_name, contract_address, deployer, "unverified")
+                        verify_contract(rpc_url, chain_config, token_name, contract_address, deployer)
+                        while True:
+                            post_deployment_actions(w3, acct, chain_id, contract_address, private_key)
+                            resume = get_input("Resume actions for this token? (yes/no or 'b' to go back): ")
+                            if resume is None or resume.lower() in ['b','back','no']:
+                                print("Returning to token menu...\n")
+                                break
+                    else:
+                        print("[!] Deployment failed or canceled.")
+                else:
+                    try:
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(tokens):
+                            token_name_saved, contract_address_saved, status = tokens[idx]
+                            print(f"\n[+] Resuming post-deployment actions for {token_name_saved} at {contract_address_saved} [{status}]")
+                            if status.lower() == "unverified":
+                                verify_contract(rpc_url, chain_config, token_name_saved, contract_address_saved, deployer)
+                            while True:
+                                post_deployment_actions(w3, acct, chain_id, contract_address_saved, private_key)
+                                resume = get_input("Resume actions for this token? (yes/no or 'b' to go back): ")
+                                if resume is None or resume.lower() in ['b','back','no']:
+                                    print("Returning to token menu...\n")
+                                    break
+                        else:
+                            print("[!] Invalid selection.")
+                    except ValueError:
+                        print("[!] Invalid selection.")
+    print("Exiting program. Goodbye!")
+
+# ----------------------------------------------------------------------
+# 8) ENTRY POINT
+# ----------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()
