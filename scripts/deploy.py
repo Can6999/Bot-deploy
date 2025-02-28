@@ -487,12 +487,10 @@ def main():
                     print(f"\nFound the following deployed tokens on {chain_name} by {deployer}:")
                     for idx, (tname, taddr, status) in enumerate(tokens, start=1):
                         print(f"{idx}. {tname} at {taddr} [{status}]")
-                        
                 else:
-                print(f"\nNo tokens found on {chain_name} yet for deployer {deployer}.")
-
-                print("b. Back to chain selection")
-                print("Or press Enter to deploy a new token.")
+                    print(f"\nNo tokens found on {chain_name} yet for deployer {deployer}.")
+                    print("b. Back to chain selection")
+                    print("Or press Enter to deploy a new token.")
                                                                                                                                                                                                  
                 choice = get_input("Select a token index to resume, 'b' to go back, or Enter to deploy new: ", allow_back=True)
                 if choice is None:                                                                                                                                                                   
