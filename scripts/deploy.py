@@ -40,11 +40,13 @@ def load_keys(filename="keys.txt"):
                 keys[label.strip()] = key_value.strip()
     return keys
 
-def select_key():                                                                           """
+def select_key()           
+    """
     Shows a list of private keys from keys.txt and allows the user to pick one.
     The user can also type 'b' to exit the program (since there's no previous menu).
     Returns the selected private key string or None if the user typed 'b'.
-    """                                                                                     while True:
+    """
+    while True:
         keys = load_keys()
         if not keys:
             print("[!] No keys found in keys.txt")
@@ -57,11 +59,13 @@ def select_key():                                                               
         print("b. Back (Exit Program)")
 
         choice = get_input(f"Select a key (1-{len(key_labels)}) or 'b' to exit: ")
-        if choice is None:                                                                          return None
+        if choice is None:                                                                          
+            return None
 
         try:
             idx = int(choice)
-            if 1 <= idx <= len(key_labels):                                                             selected_label = key_labels[idx - 1]
+            if 1 <= idx <= len(key_labels):                                                             
+                selected_label = key_labels[idx - 1]
                 print(f"[✓] Selected key: {selected_label}")
                 return keys[selected_label]
             else:
