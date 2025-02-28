@@ -233,6 +233,9 @@ def deploy_contract(name):
     result = subprocess.run(deploy_cmd, capture_output=True, text=True)
     print("Deployment Output:")
     print(result.stdout)
+    if result.stderr:
+        print("Deployment Error Output:")
+        print(result.stderr)
     if "Deployed to:" in result.stdout:
         contract_address = result.stdout.split("Deployed to: ")[1].split("\n")[0].strip()
         print(f"[✓] Contract Deployed at: {contract_address}")
