@@ -104,10 +104,16 @@ def select_chain():
             print("[!] Invalid input. Please enter a number.")
             exit(1)
 
+def get_verifier_url(chain_config):
+    """
+    Extracts the verifier_url from a chain configuration.
+    Looks for either 'verifier_url' or 'VERIFIER_URL' in the chain_config.
+    Returns the verifier_url or a default value if not found.
+    """
+    return chain_config.get("verifier_url") or chain_config.get("VERIFIER_URL") or "https://sourcify-api-monad.blockvision.org"
+
 # --- Token Storage Functions ---
 
-# We'll now store tokens with a verification status.
-# Format for common file: key_label, token_name, contract_address, verification_status
 def store_contract_info_single(token_name, contract_address, key_label, filename="contract_info.txt"):
     with open(filename, "a") as f:
         f.write(f"{key_label},{token_name},{contract_address},unverified\n")
@@ -168,9 +174,7 @@ def update_contract_status_in_file(filename, contract_address, new_status):
             if not line_strip:
                 continue
             parts = line_strip.split(",")
-            # Expecting at least three parts: key_label, token_name, contract_address
             if len(parts) >= 3 and parts[2] == contract_address:
-                # Update the status field
                 if len(parts) == 3:
                     parts.append(new_status)
                 else:
@@ -183,7 +187,6 @@ def update_contract_status_in_file(filename, contract_address, new_status):
         f.writelines(updated_lines)
 
 def update_verified_status(contract_address, key_label):
-    # Update both storage files for the given contract address.
     update_contract_status_in_file("contract_info.txt", contract_address, "verified")
     update_contract_status_in_file(get_tokens_filename(key_label), contract_address, "verified")
 
@@ -227,7 +230,6 @@ contract {name} is ERC20, Ownable {{
 }}
 '''
 
-# File to save deployed token info for the common file approach.
 CONTRACT_INFO_FILE = "contract_info.txt"
 
 # --- Deployment and Post-Deployment Functions ---
@@ -302,7 +304,7 @@ def verify_contract(contract_address, name, prompt_for_verification=True):
             "--rpc-url", RPC_URL,
         ]
     else:
-        verifier_url = chain_config.get("VERIFIER_URL", "https://sourcify-api-monad.blockvision.org")
+        verifier_url = get_verifier_url(chain_config)
         print("[+] Using Sourcify verification for chain:", chain_config["name"])
         print("[+] Verifier URL:", verifier_url)
         verify_cmd = [
@@ -415,7 +417,7 @@ def post_deployment_actions(contract_address, name):
         print("2. Burn tokens")
         print("3. Renounce ownership")
         print("4. Transfer tokens")
-        print("5. Verify contract")  # New option for verifying unverified contracts
+        print("5. Verify contract")
         print("0. Exit post deployment actions")
         choice = input("Select an action (0-5): ")
         if choice == "1":
@@ -427,7 +429,6 @@ def post_deployment_actions(contract_address, name):
         elif choice == "4":
             transfer_tokens(contract_address)
         elif choice == "5":
-            # Directly verify the contract without an extra prompt
             verify_contract(contract_address, name, prompt_for_verification=False)
         elif choice == "0":
             confirm = input("Are you sure you want to exit post deployment actions? (yes/no): ")
@@ -486,12 +487,10 @@ if __name__ == "__main__":
     compile_contract()
     contract_address = deploy_contract(name)
     if contract_address:
-        # Save token info using both approaches.
         store_contract_info_single(name, contract_address, selected_key_label, filename=CONTRACT_INFO_FILE)
         store_contract_info_separate(name, contract_address, selected_key_label)
-        verify_contract(contract_address, name)  # Initial verification prompt
+        verify_contract(contract_address, name)
         
-        # Outer loop: allow re-entry into post deployment actions.
         while True:
             post_deployment_actions(contract_address, name)
             resume = input("Would you like to resume post deployment actions for this token? (yes/no): ")
