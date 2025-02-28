@@ -11,5 +11,6 @@ CHAIN_ID=200018
 ETHERSCAN_API_KEY=https://node2.testnet.romeprotocol.xyz:1000/
 
 name=Sepolia
+CHAIN_ID=11155111
 RPC_URL=https://rpc.sepolia.org
 ETHERSCAN_API_KEY=https://api-sepolia.etherscan.io/api
