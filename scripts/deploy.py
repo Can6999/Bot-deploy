@@ -2,9 +2,9 @@ import os
 import subprocess
 from web3 import Web3
 from eth_account import Account
-from can_utils import can
+from can_utils import banner
 
-if __name__ == "__main__":
+
     banner()
 
 
