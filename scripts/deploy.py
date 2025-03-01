@@ -174,7 +174,7 @@ CONTRACT_INFO_FILE = "contract_info.txt"
 def install_foundry_dependencies():
     if not os.path.exists("lib"):
         print("[+] Installing Foundry Dependencies...")
-        subprocess.run(["forge install --no-commit"], check=True)
+        subprocess.run(["forge", "install", "--no-commit"], check=True)
         print("[✓] Foundry Dependencies Installed")
     else:
         print("[✓] Foundry Dependencies Already Installed")
