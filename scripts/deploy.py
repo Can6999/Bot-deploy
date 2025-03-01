@@ -460,7 +460,7 @@ def post_deployment_actions(w3, acct, chain_id, contract_address, private_key):
 # 7) MAIN PROGRAM: NESTED LOOPS
 # ----------------------------------------------------------------------
 
-def main()
+def main():
     install_foundry_dependencies()
 
     while True:
