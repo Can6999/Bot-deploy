@@ -4,6 +4,7 @@ from web3 import Web3
 from eth_account import Account
 from can_utils import banner
 
+banner()
 
 
 # ----------------------------------------------------------------------
@@ -459,8 +460,7 @@ def post_deployment_actions(w3, acct, chain_id, contract_address, private_key):
 # 7) MAIN PROGRAM: NESTED LOOPS
 # ----------------------------------------------------------------------
 
-def main():
-    banner() 
+def main()
     install_foundry_dependencies()
 
     while True:
