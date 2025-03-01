@@ -19,3 +19,8 @@ name=somnia
 CHAIN_ID=50312
 RPC_URL=https://dream-rpc.somnia.network
 ETHERSCAN_API_KEY=
+
+name=fluent
+CHAIN_ID=20993
+RPC_URL=https://textrpc.dev.gblend.xyz/
+ETHERSCAN_API_KEY=https://blockscout.dev.gblend.xyz/api
